@@ -59,7 +59,21 @@ recipe() {
       lz4)       return 0 ;;
       libcap)    return 0 ;;
       file)      ./configure --prefix=/usr ;;
-      readline)  ./configure --prefix=/usr --disable-static --with-curses \
+      readline)  # Two things here are not optional.
+                 #
+                 # 1. readline's shared library only links ncurses if SHLIB_LIBS
+                 #    says so (see build_cmd).  --with-curses alone affects the
+                 #    static link, not the .so, and a readline without ncurses
+                 #    resolves none of the termcap symbols (UP, BC, PC) its callers
+                 #    need -- it installs cleanly and breaks everything after.
+                 # 2. readline's install renames the previous library to .old
+                 #    instead of removing it.  Two files then share a SONAME,
+                 #    ldconfig may point the .so.N symlink at the .old one, and
+                 #    deleting the backup later orphans the link.  LFS strips that
+                 #    behaviour out; so do we.
+                 sed -i '/MV.*old/d' Makefile.in
+                 sed -i '/{OLDSUFF}/c:' support/shlib-install
+                 ./configure --prefix=/usr --disable-static --with-curses \
                      --docdir=/usr/share/doc/readline-"$ver" ;;
       ncurses)   ./configure --prefix=/usr --mandir=/usr/share/man --with-shared \
                      --without-debug --without-normal --with-cxx-shared --enable-pc-files ;;
@@ -79,6 +93,7 @@ recipe() {
 
 build_cmd() {
     case "$1" in
+      readline) echo "make -j$BF_JOBS SHLIB_LIBS=-lncursesw" ;;
       zstd)   echo "make -j$BF_JOBS PREFIX=/usr" ;;
       lz4)    echo "make -j$BF_JOBS PREFIX=/usr" ;;
       libcap) echo "make -j$BF_JOBS prefix=/usr lib=lib" ;;
@@ -132,6 +147,15 @@ while IFS='|' read -r tier name ver url; do
 
     rpmfile=$(ls -t /root/rpmbuild/RPMS/*/"$name"-"$ver"-*.rpm 2>/dev/null | head -1)
     [ -n "$rpmfile" ] || { warn "$name: no rpm produced"; failed=$((failed+1)); continue; }
+
+    # Gate: a rebuild whose configure flags differ from the original produces a
+    # library that packages cleanly and then breaks its consumers at run time.
+    # Compare against what is on disk before replacing anything.
+    if ! "$HERE/tools/bf-abi-check" "$rpmfile" >>"$L" 2>&1; then
+        warn "$name: ABI regression against the installed copy - NOT installing"
+        "$HERE/tools/bf-abi-check" "$rpmfile" 2>&1 | sed 's/^/      /' | head -8
+        failed=$((failed+1)); continue
+    fi
 
     if [ "$BF_INSTALL" = "1" ]; then
         if rpm -Uvh --replacefiles --replacepkgs "$rpmfile" >>"$L" 2>&1; then

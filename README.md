@@ -36,6 +36,7 @@ re-run. Delete a stamp to force a rebuild.
 | `50-repotools` | createrepo_c |
 | `60-seed` | rpm macros, GPG key, `blackflag-release`, `blackflag-base`, repo config |
 | `70-selfhost` | repackage the bootstrap stack as RPMs so dnf can upgrade dnf |
+| `80-basepkgs` | convert the LFS base system into real RPMs, by risk tier |
 
 ## Tools installed
 
@@ -48,6 +49,7 @@ re-run. Delete a stamp to force a rebuild.
 | `bf-selftest` | end-to-end check: build → sign → publish → install → remove |
 | `bf-lfs-audit` | how much of the filesystem RPM actually owns |
 | `bf-repack` | turn an already-built tree into an RPM without recompiling |
+| `bf-abi-check` | compare a rebuilt package's libraries against the installed ones |
 
 ## Layout
 

@@ -1,0 +1,79 @@
+#!/bin/bash
+# bf-abi-check <rpm>... - compare a rebuilt package against what is installed.
+#
+# Converting the LFS base means rebuilding packages whose original configure flags
+# nobody recorded.  A rebuild with slightly different flags produces a library that
+# looks fine and installs cleanly, and then breaks every consumer.
+#
+# That is not hypothetical: a readline rebuilt here linked no libncursesw, so it
+# resolved none of the termcap symbols (UP, BC, PC) its callers expect.  Installing
+# it broke gawk instantly and bash on next start.
+#
+# So before any converted base package is installed, check each shared object in it
+# against the one already on disk:
+#   - SONAME must be identical, or consumers stop finding it
+#   - DT_NEEDED must not LOSE entries, or symbols silently go unresolved
+#   - exported symbols must not disappear
+#
+# Exit 0 if every library is compatible, 1 if any regressed.
+set -u
+C_G='\033[0;32m'; C_R='\033[0;31m'; C_Y='\033[1;33m'; C_N='\033[0m'
+rc=0
+
+soname()  { readelf -d "$1" 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p' | head -1; }
+needed()  { readelf -d "$1" 2>/dev/null | sed -n 's/.*NEEDED.*\[\(.*\)\].*/\1/p' | sort; }
+exports() { nm -D --defined-only "$1" 2>/dev/null | awk '{print $NF}' | sort -u; }
+
+for pkg in "$@"; do
+    [ -f "$pkg" ] || { echo "no such file: $pkg" >&2; rc=1; continue; }
+    pkg=$(readlink -f "$pkg")          # rpm2cpio runs after a cd; keep the path absolute
+    echo "== $(basename "$pkg")"
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+    ( cd "$tmp" && rpm2cpio "$pkg" | cpio -idm --quiet 2>/dev/null )
+
+    found=0
+    while read -r f; do
+        rel="${f#$tmp}"
+        [ -f "$rel" ] || continue                      # not installed; nothing to compare
+        head -c4 "$f" | grep -q ELF || continue
+        found=$((found+1))
+
+        ns=$(soname "$f");   os=$(soname "$rel")
+        if [ "$ns" != "$os" ]; then
+            printf "  ${C_R}SONAME${C_N}   %s: installed=%s new=%s\n" "$rel" "${os:-none}" "${ns:-none}"
+            rc=1; continue
+        fi
+
+        lost_need=$(comm -23 <(needed "$rel") <(needed "$f"))
+        if [ -n "$lost_need" ]; then
+            printf "  ${C_R}NEEDED${C_N}   %s no longer links: %s\n" "$rel" "$(echo $lost_need)"
+            printf "           its symbols will not resolve at run time\n"
+            rc=1; continue
+        fi
+
+        lost_sym=$(comm -23 <(exports "$rel") <(exports "$f") | head -10)
+        if [ -n "$lost_sym" ]; then
+            n=$(comm -23 <(exports "$rel") <(exports "$f") | wc -l)
+            printf "  ${C_R}SYMBOLS${C_N}  %s drops %d exported symbol(s): %s\n" \
+                   "$rel" "$n" "$(echo $lost_sym | cut -c1-60)"
+            rc=1; continue
+        fi
+
+        gained=$(comm -13 <(needed "$rel") <(needed "$f"))
+        if [ -n "$gained" ]; then
+            printf "  ${C_Y}note${C_N}     %s additionally links: %s\n" "$rel" "$(echo $gained)"
+        fi
+        printf "  ${C_G}ok${C_N}       %s\n" "$rel"
+    done < <(find "$tmp" -type f -name '*.so*')
+
+    [ "$found" -eq 0 ] && echo "  (no shared libraries to compare)"
+    rm -rf "$tmp"; trap - EXIT
+done
+
+if [ $rc -ne 0 ]; then
+    echo
+    echo -e "${C_R}Do not install these packages.${C_N}  A rebuild that loses a NEEDED entry or an"
+    echo "exported symbol will break its consumers at run time, not at install time."
+    echo "Fix the configure flags so the rebuild matches what is on disk."
+fi
+exit $rc
