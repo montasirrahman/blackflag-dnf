@@ -1,0 +1,145 @@
+#!/bin/bash
+# bf-repo - BlackFlag Linux repository management.
+#
+#   bf-repo init   <repo>                 create an empty repository tree
+#   bf-repo add    <repo> <rpm>...        sign RPMs and copy them in
+#   bf-repo update <repo>                 regenerate + sign repodata
+#   bf-repo sign   <rpm>...               sign RPMs in place
+#   bf-repo list   <repo>                 what is in the repo
+#   bf-repo clean  <repo> [keep]          keep N newest builds per name (default 2)
+#   bf-repo verify <repo>                 check every signature and checksum
+#
+# <repo> may be a bare name (resolved under $BF_REPO_ROOT) or a path.
+set -u
+
+BF_REPO_ROOT="${BF_REPO_ROOT:-/srv/blackflag/repo}"
+BF_GPG_NAME="${BF_GPG_NAME:-BlackFlag Linux Package Signing Key <security@blackflag.com.bd>}"
+export GNUPGHOME="${GNUPGHOME:-/root/.gnupg}"
+
+C_G='\033[0;32m'; C_R='\033[0;31m'; C_C='\033[0;36m'; C_Y='\033[1;33m'; C_N='\033[0m'
+msg()  { echo -e "${C_C}==>${C_N} $*"; }
+ok()   { echo -e "${C_G} ok ${C_N} $*"; }
+warn() { echo -e "${C_Y} !! ${C_N} $*"; }
+die()  { echo -e "${C_R}error:${C_N} $*" >&2; exit 1; }
+
+resolve() {
+    case "$1" in
+        /*|./*|../*) echo "$1" ;;
+        *)           echo "$BF_REPO_ROOT/$1" ;;
+    esac
+}
+
+have_key() { gpg --list-secret-keys "$BF_GPG_NAME" >/dev/null 2>&1; }
+
+cmd_init() {
+    local r; r=$(resolve "$1")
+    install -d "$r/Packages" "$r/repodata"
+    createrepo_c --quiet "$r" || die "createrepo_c failed"
+    ok "initialised $r"
+}
+
+cmd_sign() {
+    have_key || { warn "no signing key for '$BF_GPG_NAME' - skipping signatures"; return 0; }
+    local f
+    for f in "$@"; do
+        [ -f "$f" ] || { warn "no such file: $f"; continue; }
+        if rpm -qp --qf '%{SIGPGP:pgpsig}' "$f" 2>/dev/null | grep -q .; then
+            echo "    already signed: $(basename "$f")"; continue
+        fi
+        rpmsign --define "_gpg_name $BF_GPG_NAME" --addsign "$f" >/dev/null 2>&1 \
+            && echo "    signed: $(basename "$f")" || warn "sign failed: $f"
+    done
+}
+
+cmd_add() {
+    local r; r=$(resolve "$1"); shift
+    [ -d "$r" ] || die "repo not found: $r (run 'bf-repo init' first)"
+    install -d "$r/Packages"
+    local f n=0
+    for f in "$@"; do
+        [ -f "$f" ] || { warn "no such file: $f"; continue; }
+        rpm -qp "$f" >/dev/null 2>&1 || { warn "not an rpm: $f"; continue; }
+        cp -f "$f" "$r/Packages/" && n=$((n+1))
+    done
+    msg "signing $n package(s)"
+    cmd_sign "$r"/Packages/*.rpm
+    cmd_update "$r"
+    ok "added $n package(s) to $r"
+}
+
+cmd_update() {
+    local r; r=$(resolve "$1")
+    [ -d "$r" ] || die "repo not found: $r"
+    msg "generating repodata for $r"
+    createrepo_c --quiet --update --zck --general-compress-type=zstd \
+        --revision="$(date -u +%Y%m%d%H%M%S)" "$r" \
+        || createrepo_c --quiet --update "$r" \
+        || die "createrepo_c failed"
+    # The detached signature over repomd.xml is the repository's trust root:
+    # repomd.xml carries the checksums of every other metadata file.
+    if have_key; then
+        rm -f "$r/repodata/repomd.xml.asc"
+        gpg --batch --yes --detach-sign --armor \
+            --local-user "$BF_GPG_NAME" "$r/repodata/repomd.xml" \
+            && ok "repomd.xml signed"
+        gpg --armor --export "$BF_GPG_NAME" > "$r/RPM-GPG-KEY-blackflag" 2>/dev/null
+    else
+        warn "no signing key - repodata is UNSIGNED (set repo_gpgcheck=0 to consume it)"
+    fi
+    ok "repodata updated: $(ls "$r"/Packages/*.rpm 2>/dev/null | wc -l) package(s)"
+}
+
+cmd_list() {
+    local r; r=$(resolve "$1")
+    local f
+    printf "%-38s %-14s %-10s %s\n" NAME VERSION ARCH SIGNED
+    for f in "$r"/Packages/*.rpm; do
+        [ -f "$f" ] || continue
+        local sig=no
+        rpm -qp --qf '%{SIGPGP:pgpsig}' "$f" 2>/dev/null | grep -q . && sig=yes
+        rpm -qp --qf "%-38{NAME} %-14{VERSION}-%{RELEASE} %-10{ARCH} $sig\n" "$f" 2>/dev/null
+    done
+}
+
+cmd_clean() {
+    local r; r=$(resolve "$1"); local keep="${2:-2}"
+    local name
+    for name in $(rpm -qp --qf '%{NAME}\n' "$r"/Packages/*.rpm 2>/dev/null | sort -u); do
+        local old
+        old=$(ls -t "$r"/Packages/"$name"-[0-9]*.rpm 2>/dev/null | tail -n +$((keep+1)))
+        [ -n "$old" ] && { echo "$old" | xargs -r rm -v; }
+    done
+    cmd_update "$r"
+}
+
+cmd_verify() {
+    local r; r=$(resolve "$1") rc=0
+    msg "verifying package signatures"
+    local f
+    for f in "$r"/Packages/*.rpm; do
+        [ -f "$f" ] || continue
+        rpmkeys --checksig "$f" | grep -qi 'digests signatures OK' \
+            || { echo "  BAD: $(basename "$f")"; rc=1; }
+    done
+    msg "verifying repomd signature"
+    if [ -f "$r/repodata/repomd.xml.asc" ]; then
+        gpg --verify "$r/repodata/repomd.xml.asc" "$r/repodata/repomd.xml" 2>&1 | sed 's/^/  /'
+    else
+        warn "repomd.xml.asc missing (repo unsigned)"
+    fi
+    [ $rc -eq 0 ] && ok "all packages verified"
+    return $rc
+}
+
+usage() { sed -n '2,/^set -u/p' "$0" | sed 's/^# \{0,1\}//' | head -n -1; }
+
+case "${1:-}" in
+    init)   shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_init   "$@" ;;
+    add)    shift; [ $# -ge 2 ] || { usage; exit 1; }; cmd_add    "$@" ;;
+    update) shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_update "$@" ;;
+    sign)   shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_sign   "$@" ;;
+    list)   shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_list   "$@" ;;
+    clean)  shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_clean  "$@" ;;
+    verify) shift; [ $# -ge 1 ] || { usage; exit 1; }; cmd_verify "$@" ;;
+    *)      usage; exit 1 ;;
+esac

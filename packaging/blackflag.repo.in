@@ -1,0 +1,24 @@
+# BlackFlag Linux network repositories
+[blackflag-os]
+name=BlackFlag Linux $releasever - OS ($basearch)
+baseurl=https://repo.blackflag.com.bd/blackflag/$releasever/$basearch/os/
+enabled=0
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/@KEYFILE@
+
+[blackflag-updates]
+name=BlackFlag Linux $releasever - Updates ($basearch)
+baseurl=https://repo.blackflag.com.bd/blackflag/$releasever/$basearch/updates/
+enabled=0
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/@KEYFILE@
+
+[blackflag-extras]
+name=BlackFlag Linux $releasever - Extras ($basearch)
+baseurl=https://repo.blackflag.com.bd/blackflag/$releasever/$basearch/extras/
+enabled=0
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/@KEYFILE@

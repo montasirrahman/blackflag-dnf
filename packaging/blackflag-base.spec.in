@@ -1,0 +1,40 @@
+# Generated from blackflag-base.spec.in by stages/60-seed.sh -- do not edit the
+# generated copy.  The @PROVIDES@ marker is replaced with the output of
+# packaging/gen-base-provides.sh, which reads the live system.
+#
+# This package intentionally owns NO files.  It is installed with `rpm -i --justdb`
+# so that the rpm database reflects the LFS userland that was built before rpm
+# existed.  See docs/ARCHITECTURE.md section 5 for the trade-offs and the plan to
+# retire it.
+Name:           blackflag-base
+Version:        1.0.0
+Release:        1%{?dist}
+Summary:        Virtual package describing the pre-RPM BlackFlag base system
+
+License:        MIT
+URL:            https://blackflag.com.bd
+BuildArch:      x86_64
+
+Requires:       blackflag-release
+
+@PROVIDES@
+
+%description
+BlackFlag Linux was bootstrapped from Linux From Scratch, so its base userland --
+glibc, bash, coreutils, systemd, the toolchain and the core libraries -- was
+installed before any package manager existed and is therefore owned by no RPM.
+
+This package owns no files. It exists so that the RPM database can honestly answer
+"is glibc present?" and so that dependency resolution for newly built BlackFlag
+packages succeeds instead of trying to reinstall the running system. Its Provides
+list is generated on the build host from the actual shared-library sonames,
+pkg-config modules and base package versions found there.
+
+As base components are rebuilt as real RPMs, they are removed from this list; when
+it is empty this package is retired.
+
+%files
+
+%changelog
+* Sat Sep 06 2026 BlackFlag Build System <build@blackflag.com.bd> - 1.0.0-1
+- Initial base-provides shim generated from the LFS 12.4 base system

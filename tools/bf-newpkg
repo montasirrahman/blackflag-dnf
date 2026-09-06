@@ -1,0 +1,73 @@
+#!/bin/bash
+# bf-newpkg <name> [version] [url] - scaffold a BlackFlag spec file.
+#
+# Writes ~/rpmbuild/SPECS/<name>.spec from a template that already follows the
+# BlackFlag conventions (%dist, zstd payload, signing, buildroot hygiene) so a new
+# package starts from something that builds rather than from a blank file.
+set -u
+name="${1:?usage: bf-newpkg <name> [version] [source-url]}"
+ver="${2:-1.0.0}"
+url="${3:-https://example.com/${name}-%{version}.tar.xz}"
+top="${HOME}/rpmbuild"
+install -d "$top"/{SPECS,SOURCES,BUILD,BUILDROOT,RPMS,SRPMS}
+spec="$top/SPECS/${name}.spec"
+[ -e "$spec" ] && { echo "refusing to overwrite $spec" >&2; exit 1; }
+
+cat > "$spec" <<EOF
+Name:           ${name}
+Version:        ${ver}
+Release:        1%{?dist}
+Summary:        FIXME one-line summary
+
+License:        FIXME
+URL:            https://example.com/${name}
+Source0:        ${url}
+
+BuildRequires:  gcc
+BuildRequires:  make
+# BuildRequires:  cmake
+# BuildRequires:  meson ninja-build
+# BuildRequires:  pkgconfig(zlib)
+
+# Requires: are normally discovered automatically from the built binaries;
+# only list what rpm cannot see (scripts, data files, runtime-only tools).
+
+%description
+FIXME longer description.
+
+%prep
+%autosetup
+
+%build
+%configure --disable-static
+%make_build
+
+%install
+%make_install
+find %{buildroot} -name '*.la' -delete
+
+%check
+# %make_build check
+
+%files
+%license COPYING
+%doc README
+%{_bindir}/*
+%{_libdir}/*.so.*
+
+%package devel
+Summary:        Development files for ${name}
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+%description devel
+Headers and libraries for developing against ${name}.
+%files devel
+%{_includedir}/*
+%{_libdir}/*.so
+%{_libdir}/pkgconfig/*.pc
+
+%changelog
+* $(LC_ALL=C date '+%a %b %d %Y') $(git config user.name 2>/dev/null || echo "BlackFlag Build System") <$(git config user.email 2>/dev/null || echo build@blackflag.com.bd)> - ${ver}-1
+- Initial BlackFlag package
+EOF
+echo "created $spec"
+echo "next:  spectool-style fetch of Source0 into $top/SOURCES, then:  rpmbuild -ba $spec"

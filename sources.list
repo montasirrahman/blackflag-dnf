@@ -1,0 +1,31 @@
+# BlackFlag DNF Bootstrap - source manifest
+# format: stage|name|version|url
+00|curl|8.15.0|https://curl.se/download/curl-8.15.0.tar.xz
+00|git|2.51.0|https://www.kernel.org/pub/software/scm/git/git-2.51.0.tar.xz
+00|cmake|3.31.6|https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6.tar.gz
+00|pcre2|10.45|https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.45/pcre2-10.45.tar.bz2
+00|libxml2|2.13.8|https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.8.tar.xz
+00|swig|4.3.1|https://downloads.sourceforge.net/swig/swig-4.3.1.tar.gz
+10|libgpg-error|1.55|https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.55.tar.bz2
+10|libgcrypt|1.11.1|https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.1.tar.bz2
+10|libassuan|3.0.2|https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-3.0.2.tar.bz2
+10|libksba|1.6.7|https://www.gnupg.org/ftp/gcrypt/libksba/libksba-1.6.7.tar.bz2
+10|npth|1.8|https://www.gnupg.org/ftp/gcrypt/npth/npth-1.8.tar.bz2
+10|gnupg|2.4.8|https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.4.8.tar.bz2
+10|gpgme|1.24.3|https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-1.24.3.tar.bz2
+20|lua|5.4.8|https://www.lua.org/ftp/lua-5.4.8.tar.gz
+20|rpm|4.20.1|https://ftp.osuosl.org/pub/rpm/releases/rpm-4.20.x/rpm-4.20.1.tar.bz2
+30|libyaml|0.2.5|https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz
+30|glib|2.84.4|https://download.gnome.org/sources/glib/2.84/glib-2.84.4.tar.xz
+30|json-c|0.18|https://github.com/json-c/json-c/archive/refs/tags/json-c-0.18-20240915.tar.gz
+30|zchunk|1.5.1|https://github.com/zchunk/zchunk/archive/refs/tags/1.5.1.tar.gz
+30|libsolv|0.7.32|https://github.com/openSUSE/libsolv/archive/refs/tags/0.7.32.tar.gz
+30|librepo|1.20.0|https://github.com/rpm-software-management/librepo/archive/refs/tags/1.20.0.tar.gz
+30|libcomps|0.1.21|https://github.com/rpm-software-management/libcomps/archive/refs/tags/0.1.21.tar.gz
+30|libmodulemd|2.15.2|https://github.com/fedora-modularity/libmodulemd/archive/refs/tags/libmodulemd-2.15.2.tar.gz
+30|fmt|11.1.4|https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
+30|spdlog|1.15.1|https://github.com/gabime/spdlog/archive/refs/tags/v1.15.1.tar.gz
+30|toml11|4.4.0|https://github.com/ToruNiina/toml11/archive/refs/tags/v4.4.0.tar.gz
+30|sqlite|3500400|https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz
+40|dnf5|5.2.13.0|https://github.com/rpm-software-management/dnf5/archive/refs/tags/5.2.13.0.tar.gz
+50|createrepo_c|1.2.1|https://github.com/rpm-software-management/createrepo_c/archive/refs/tags/1.2.1.tar.gz
