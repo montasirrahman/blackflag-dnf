@@ -1,0 +1,59 @@
+#!/bin/bash
+# bf-lfs-audit - measure how much of the system RPM actually owns.
+#
+# BlackFlag's base userland was built by LFS before rpm existed, so it belongs to
+# no package.  blackflag-base papers over that for dependency resolution only
+# (docs/ARCHITECTURE.md section 5).  Converting the base to real RPMs is a long
+# job, and a long job needs a number that moves.
+#
+#   bf-lfs-audit             summary
+#   bf-lfs-audit --unowned   list unowned files
+#   bf-lfs-audit --dirs      unowned file count per directory, worst first
+#   bf-lfs-audit --provides  what blackflag-base is still standing in for
+set -u
+command -v rpm >/dev/null || { echo "rpm not installed" >&2; exit 1; }
+
+SCAN="${BF_AUDIT_DIRS:-/usr/bin /usr/sbin /usr/lib /usr/libexec /usr/include /usr/share /etc}"
+CACHE=$(mktemp); trap 'rm -f "$CACHE" "$CACHE.owned"' EXIT
+
+# One rpm -qa dump is far cheaper than one rpm -qf per file.
+rpm -qal 2>/dev/null | sort -u > "$CACHE.owned"
+
+list_all()     { find $SCAN -xdev \( -type f -o -type l \) -print 2>/dev/null | sort -u; }
+list_unowned() { comm -23 <(list_all) "$CACHE.owned"; }
+
+case "${1:-summary}" in
+  --unowned)  list_unowned ;;
+  --dirs)
+      list_unowned | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -40 ;;
+  --provides)
+      if rpm -q blackflag-base >/dev/null 2>&1; then
+          echo "Still supplied by the blackflag-base shim:"
+          rpm -q --provides blackflag-base | sed 's/^/  /'
+      else
+          echo "blackflag-base is not installed - the base is fully RPM-owned,"
+          echo "or the rpmdb has not been seeded yet."
+      fi ;;
+  summary|*)
+      total=$(list_all | wc -l)
+      unowned=$(list_unowned | wc -l)
+      owned=$(( total - unowned ))
+      pct=0; [ "$total" -gt 0 ] && pct=$(( owned * 100 / total ))
+      pkgs=$(rpm -qa | wc -l)
+      shim=0
+      rpm -q blackflag-base >/dev/null 2>&1 && shim=$(rpm -q --provides blackflag-base | wc -l)
+
+      printf '\n\033[1mBlackFlag RPM ownership audit\033[0m\n\n'
+      printf '  installed packages     %d\n' "$pkgs"
+      printf '  files scanned          %d\n' "$total"
+      printf '  owned by an RPM        %d\n' "$owned"
+      printf '  owned by nothing       %d\n' "$unowned"
+      printf '  coverage               %d%%\n' "$pct"
+      printf '  shim provides          %d\n' "$shim"
+      printf '\n  scanned: %s\n' "$SCAN"
+      printf '\n  Coverage rises as base packages are rebuilt as RPMs and installed\n'
+      printf '  with --replacefiles, each one taking ownership of files the shim\n'
+      printf '  never claimed.  When it reaches 100%%, blackflag-base is retired.\n\n'
+      printf '  next:  bf-lfs-audit --dirs      where the unowned files are\n'
+      printf '         bf-lfs-audit --provides  what the shim is covering\n\n' ;;
+esac
