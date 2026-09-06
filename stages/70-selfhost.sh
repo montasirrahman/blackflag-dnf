@@ -12,6 +12,23 @@
 REPACK="$(cd "$(dirname "$0")/../tools" && pwd)/bf-repack"
 BF_LOCALREPO="${BF_LOCALREPO:-/srv/blackflag/repo/local}"
 
+# Optional components whose dependencies are not present on BlackFlag.  Upstream
+# distributions ship these as separate subpackages (git-svn, git-cvs, git-p4) for
+# exactly this reason: they pull in perl(SVN::Core), perl(DBI), perl(CGI) and a
+# /usr/bin/python that BlackFlag does not have.  Shipping them anyway would make
+# the git package uninstallable.
+GIT_EXCLUDE="/usr/libexec/git-core/git-svn
+/usr/libexec/git-core/git-cvsserver
+/usr/libexec/git-core/git-cvsimport
+/usr/libexec/git-core/git-cvsexportcommit
+/usr/libexec/git-core/git-archimport
+/usr/libexec/git-core/git-instaweb
+/usr/libexec/git-core/git-p4
+/usr/bin/git-cvsserver
+/usr/share/perl5/Git/SVN
+/usr/share/perl5/Git/SVN.pm
+/usr/share/gitweb"
+
 # name | version | build subdirectory | install command
 PKGS=(
   "curl|8.15.0|curl-8.15.0|make install"
@@ -52,7 +69,9 @@ for entry in "${PKGS[@]}"; do
     if [ ! -d "$d" ]; then warn "no build tree for $name ($sub) - skipping"; skipped=$((skipped+1)); continue; fi
     if done_already "repack-$name"; then ok "$name (cached)"; continue; fi
     msg "repacking $name $ver"
-    if $REPACK "$name" "$ver" "$d" $cmd >>"$BF_LOGS/repack.log" 2>&1; then
+    local excl=""
+    [ "$name" = "git" ] && excl="$GIT_EXCLUDE"
+    if BF_REPACK_EXCLUDE="$excl" $REPACK "$name" "$ver" "$d" $cmd >>"$BF_LOGS/repack.log" 2>&1; then
         mark_done "repack-$name"; built=$((built+1)); ok "$name"
     else
         warn "$name failed - see $BF_LOGS/repack.log"; skipped=$((skipped+1))

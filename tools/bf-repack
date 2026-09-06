@@ -13,9 +13,15 @@
 # generates Provides/Requires from the binaries as usual, and the bootstrap stack
 # becomes ordinary RPM content that dnf can upgrade.
 #
+# BF_REPACK_EXCLUDE may hold whitespace-separated globs (rooted at /) to drop from
+# the package before %files is generated.  Use it for optional components whose
+# dependencies are not installed -- git-svn needs perl(SVN::Core), git-p4 needs
+# /usr/bin/python.  Upstream distributions solve this by splitting those into
+# subpackages; excluding them is the same decision without the subpackage.
+#
 # Examples:
-#   bf-repack rpm 4.20.1 /root/blackflag/build/rpm-4.20.1 ninja -C build install
-#   bf-repack curl 8.15.0 /root/blackflag/build/curl-8.15.0 make install
+#   bf-repack rpm 4.19.1.1 /root/blackflag/build/rpm-4.19.1.1 make -C _build install
+#   BF_REPACK_EXCLUDE="/usr/libexec/git-core/git-svn" bf-repack git ...
 set -eu
 
 name="${1:?usage: bf-repack <name> <version> <build-dir> [install-command...]}"
@@ -39,6 +45,13 @@ echo "==> staging install into $BR"
 # libtool archives and static libs are build-time leftovers; they bloat packages
 # and .la files actively break later builds by hardcoding paths.
 find "$BR" -name '*.la' -delete 2>/dev/null || true
+
+for pat in ${BF_REPACK_EXCLUDE:-}; do
+    for victim in "$BR"${pat}; do
+        [ -e "$victim" ] || continue
+        rm -rf "$victim" && echo "    excluded: ${victim#$BR}"
+    done
+done
 
 count=$(find "$BR" \( -type f -o -type l \) | wc -l)
 [ "$count" -gt 0 ] || { echo "install produced no files - wrong install command?" >&2; exit 1; }
@@ -72,10 +85,16 @@ cp -a ${BR}/. %{buildroot}/
 
 %files
 EOF
-# Emit files, then directories that nothing else is likely to own.  Escaping
-# matters: spaces, and rpm's own %, both need handling.
+# Emit the file list.  Three things need care:
+#   - rpm's own % must be escaped, and so must whitespace in filenames
+#   - rpm's brp-compress build-root policy gzips man and info pages during
+#     %install, so a list captured from DESTDIR names files that no longer
+#     exist by the time %files is processed.  Appending * to those paths is
+#     the same idiom hand-written specs use, and for the same reason.
 ( cd "$BR" && find . \( -type f -o -type l \) -printf '/%P\n' ) \
-    | sed -e 's/%/%%/g' -e 's/[[:space:]]/\\&/g' | sort
+    | sed -e 's/%/%%/g' -e 's/[[:space:]]/\\&/g' \
+          -e '\#^/usr/share/\(man\|info\)/#s/$/*/' \
+    | sort -u
 cat <<EOF
 
 %changelog
