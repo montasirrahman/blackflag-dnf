@@ -31,6 +31,15 @@ resolve() {
 
 have_key() { gpg --list-secret-keys "$BF_GPG_NAME" >/dev/null 2>&1; }
 
+# rpm prints the literal string "(none)" for an unsigned package rather than an
+# empty value, so a bare emptiness test reports every unsigned package as signed.
+# RSAHEADER is the header-only signature rpm actually verifies against.
+is_signed() {
+    local sig
+    sig=$(rpm -qp --qf '%{RSAHEADER:pgpsig}' "$1" 2>/dev/null)
+    [ -n "$sig" ] && [ "$sig" != "(none)" ]
+}
+
 cmd_init() {
     local r; r=$(resolve "$1")
     install -d "$r/Packages" "$r/repodata"
@@ -43,7 +52,7 @@ cmd_sign() {
     local f
     for f in "$@"; do
         [ -f "$f" ] || { warn "no such file: $f"; continue; }
-        if rpm -qp --qf '%{SIGPGP:pgpsig}' "$f" 2>/dev/null | grep -q .; then
+        if is_signed "$f"; then
             echo "    already signed: $(basename "$f")"; continue
         fi
         rpmsign --define "_gpg_name $BF_GPG_NAME" --addsign "$f" >/dev/null 2>&1 \
@@ -96,7 +105,7 @@ cmd_list() {
     for f in "$r"/Packages/*.rpm; do
         [ -f "$f" ] || continue
         local sig=no
-        rpm -qp --qf '%{SIGPGP:pgpsig}' "$f" 2>/dev/null | grep -q . && sig=yes
+        is_signed "$f" && sig=yes
         rpm -qp --qf "%-38{NAME} %-14{VERSION}-%{RELEASE} %-10{ARCH} $sig\n" "$f" 2>/dev/null
     done
 }

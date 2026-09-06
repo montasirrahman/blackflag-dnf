@@ -14,8 +14,16 @@ BF_LOCALREPO="${BF_LOCALREPO:-/srv/blackflag/repo/local}"
 
 # ---------------------------------------------------------------- rpm macros
 s60_macros() {
-    install -d /usr/lib/rpm/macros.d /etc/rpm /etc/pki/rpm-gpg
-    cat > /usr/lib/rpm/macros.d/macros.blackflag <<EOF
+    # Location matters.  rpm's macro path is:
+    #   /usr/lib/rpm/macros -> macros.d/macros.* -> platform/<target>/macros
+    #   -> /usr/lib/rpm/<vendor>/macros -> /etc/rpm/macros.* -> /etc/rpm/macros
+    # macros.d is read BEFORE the platform file, so anything set there that the
+    # platform also sets (notably %_lib) is overwritten again.  The vendor
+    # directory -- which exists because rpm was built with RPM_VENDOR=blackflag --
+    # is read after, and is the correct home for distribution macros.
+    install -d /usr/lib/rpm/blackflag /etc/rpm /etc/pki/rpm-gpg
+    rm -f /usr/lib/rpm/macros.d/macros.blackflag
+    cat > /usr/lib/rpm/blackflag/macros <<EOF
 # BlackFlag Linux distribution macros
 %_vendor                blackflag
 %_vendor_name           $BF_VENDOR
@@ -52,7 +60,11 @@ s60_macros() {
 %_topdir                %{getenv:HOME}/rpmbuild
 %_smp_mflags            -j%(nproc)
 EOF
-    ok "macros -> /usr/lib/rpm/macros.d/macros.blackflag"
+    # Prove the override actually took, rather than assuming it did.
+    if [ "$(rpm --eval '%{_libdir}')" != "/usr/lib" ]; then
+        die "%_libdir is $(rpm --eval '%{_libdir}'), expected /usr/lib - macro file is being overridden"
+    fi
+    ok "macros -> /usr/lib/rpm/blackflag/macros (%_libdir=$(rpm --eval '%{_libdir}'))"
 }
 
 # ---------------------------------------------------------------- signing key
@@ -126,8 +138,9 @@ s60_localrepo() {
 name=BlackFlag Linux \$releasever - Local (\$basearch)
 baseurl=file://$BF_LOCALREPO
 enabled=1
-gpgcheck=0
-repo_gpgcheck=0
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file://$BF_KEYFILE
 priority=10
 EOF
     ok "local repo -> $BF_LOCALREPO"
@@ -192,6 +205,14 @@ s60_install() {
     ok "rpmdb seeded"
 }
 
+s60_publish() {
+    local top=/root/rpmbuild
+    "$(dirname "$0")/../tools/bf-repo" add "$BF_LOCALREPO" \
+        "$top"/RPMS/*/blackflag-release-*.rpm "$top"/RPMS/*/blackflag-base-*.rpm \
+        >>"$BF_LOGS/seed.log" 2>&1 || return 1
+    ok "bootstrap packages signed and published to $BF_LOCALREPO"
+}
+
 : > "$BF_LOGS/seed.log"
 s60_macros    || die "macros"
 s60_gpgkey    || die "gpg key"
@@ -200,5 +221,6 @@ s60_netrepo   || die "network repos"
 s60_buildpkgs || die "building release/base packages"
 s60_install   || die "installing release/base packages"
 s60_localrepo || die "local repo"
+s60_publish   || die "publishing bootstrap packages"
 msg "stage 60 complete"
 rpm -qa
