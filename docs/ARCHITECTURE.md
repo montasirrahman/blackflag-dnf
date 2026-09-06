@@ -93,7 +93,16 @@ stage 30  dnf libs   libyaml   glib2   json-c   zchunk   fmt → spdlog   toml11
 stage 40  dnf5       libdnf5 + dnf5 + python3 bindings
 stage 50  repo tools createrepo_c
 stage 60  seeding    blackflag-release, rpm macros, GPG key, rpmdb seed
+stage 70  self-host  repackage the whole bootstrap stack as RPMs
 ```
+
+Stage 70 deserves a note. Everything before it is installed into `/usr` by plain
+`make install`, because there is no package manager yet to do it properly. The
+side effect is that the package manager becomes the one thing on the system that
+dnf cannot upgrade and `rpm -V` cannot attest to. Stage 70 re-runs each install
+step with `DESTDIR` pointed at a buildroot and packages the result — no
+recompilation, since the trees are still built — so rpm, dnf5, libsolv and the
+rest become ordinary RPM content like anything else.
 
 Why each of the stage-30 libraries is required:
 
@@ -284,10 +293,11 @@ The migration is one-directional and gradual:
 
 - [x] Survey the base system, decide dnf5 vs dnf4
 - [x] Stage scripts for the full bootstrap chain
+- [x] Stage scripts for seeding (60) and self-hosting (70)
+- [x] Tooling: `bf-repo`, `bf-newpkg`, `bf-selftest`, `bf-lfs-audit`, `bf-repack`, `hud2rpm`, `hud-compat`
 - [ ] Build stages 00–50 (in progress)
-- [ ] Stage 60: GPG key, macros, `blackflag-release`, rpmdb seeding
-- [ ] First working `dnf5 install` from a local repo
-- [ ] `rpmbuild` verified end to end; spec template + `bf-newpkg` helper
+- [ ] First working `dnf5 install` from a local repo (`bf-selftest`)
+- [ ] Stage 70: bootstrap stack owned by rpm
 - [ ] Publish bootstrap repo to GitHub Pages
 - [ ] `hud2rpm` converter
 - [ ] Convert the LFS base to RPMs (§5C), retire `blackflag-base`
