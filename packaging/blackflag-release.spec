@@ -63,5 +63,5 @@ EOF
 %{_sysconfdir}/pki/rpm-gpg/RPM-GPG-KEY-blackflag-1.0
 
 %changelog
-* Sat Sep 06 2026 BlackFlag Build System <build@blackflag.com.bd> - 1.0.0-1
+* Sun Sep 06 2026 BlackFlag Build System <build@blackflag.com.bd> - 1.0.0-1
 - Initial release: os-release, signing key, repository definitions

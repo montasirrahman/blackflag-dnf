@@ -37,5 +37,5 @@ it is empty this package is retired.
 %files
 
 %changelog
-* Sat Sep 06 2026 BlackFlag Build System <build@blackflag.com.bd> - 1.0.0-1
+* Sun Sep 06 2026 BlackFlag Build System <build@blackflag.com.bd> - 1.0.0-1
 - Initial base-provides shim generated from the LFS 12.4 base system

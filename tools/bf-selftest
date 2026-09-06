@@ -56,7 +56,7 @@ sect "7. build + publish + install round trip"
 TMPTOP=$(mktemp -d); TMPREPO=$(mktemp -d)
 export HOME_ORIG="$HOME"
 mkdir -p "$TMPTOP"/{SPECS,SOURCES,BUILD,BUILDROOT,RPMS,SRPMS}
-cat > "$TMPTOP/SPECS/bf-selftest-pkg.spec" <<'SPEC'
+cat > "$TMPTOP/SPECS/bf-selftest-pkg.spec" <<SPEC
 Name:           bf-selftest-pkg
 Version:        1.0
 Release:        1%{?dist}
@@ -72,7 +72,7 @@ echo working > %{buildroot}%{_datadir}/bf-selftest/marker
 %files
 %{_datadir}/bf-selftest/marker
 %changelog
-* Sat Sep 06 2026 selftest <build@blackflag.com.bd> - 1.0-1
+* $(LC_ALL=C date '+%a %b %d %Y') selftest <build@blackflag.com.bd> - 1.0-1
 - throwaway
 SPEC
 chk "rpmbuild produces an rpm" "rpmbuild --define '_topdir $TMPTOP' -bb '$TMPTOP/SPECS/bf-selftest-pkg.spec'"
