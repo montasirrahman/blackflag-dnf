@@ -43,6 +43,7 @@ re-run. Delete a stamp to force a rebuild.
 | `bf-repo` | create / add to / sign / verify / prune a BlackFlag repository |
 | `bf-newpkg` | scaffold a spec file that follows BlackFlag conventions |
 | `hud2rpm` | convert legacy `.hud` packages into RPMs |
+| `hud-compat` | translate `hud` command lines into `dnf5` ones |
 
 ## Layout
 
@@ -54,5 +55,7 @@ lib/common.sh         shared build helpers
 stages/               one script per stage
 packaging/            blackflag-release + blackflag-base specs, provides generator
 tools/                bf-repo, bf-newpkg, hud2rpm
+patches/              upstream fixes applied automatically at unpack time
 docs/ARCHITECTURE.md  the design document
+docs/PACKAGING.md     how to build a BlackFlag package
 ```

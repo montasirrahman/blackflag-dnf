@@ -1,0 +1,101 @@
+#!/bin/bash
+# hud-compat - translate HUD command lines into dnf5 equivalents.
+#
+# Installed as /usr/local/bin/hud only at the END of the migration (see
+# docs/ARCHITECTURE.md section 7, step 4), once nothing is left in /opt/hud.
+# Until then the real hud stays in place and this script is available under its
+# own name so the mapping can be exercised without taking hud out of service.
+#
+# Unknown subcommands are passed through to dnf5 rather than rejected, so the
+# shim does not have to be updated every time dnf5 grows a command.
+set -u
+
+DNF="${DNF:-dnf5}"
+command -v "$DNF" >/dev/null 2>&1 || { echo "hud: $DNF not found" >&2; exit 1; }
+
+note() { [ -n "${HUD_QUIET:-}" ] || echo "hud: -> $DNF $*" >&2; }
+run()  { note "$@"; exec "$DNF" "$@"; }
+
+cmd="${1:-help}"; shift || true
+
+# hud used "pkg=version"; dnf5 uses "pkg-version".
+translate_specs() {
+    local a out=()
+    for a in "$@"; do
+        case "$a" in
+            -y|--yes)   out+=(-y) ;;
+            --no-deps)  out+=(--setopt=install_weak_deps=False) ;;
+            *=*)        out+=("${a%%=*}-${a#*=}") ;;
+            *)          out+=("$a") ;;
+        esac
+    done
+    printf '%s\n' "${out[@]}"
+}
+
+mapfile -t ARGS < <(translate_specs "$@")
+
+case "$cmd" in
+    update)     run makecache ;;
+    install)    run install "${ARGS[@]}" ;;
+    remove)     run remove "${ARGS[@]}" ;;
+    reinstall)  run reinstall "${ARGS[@]}" ;;
+    upgrade)    run upgrade "${ARGS[@]}" ;;
+    downgrade)  run downgrade "${ARGS[@]}" ;;
+    search)     run search "${ARGS[@]}" ;;
+    show)       run info "${ARGS[@]}" ;;
+    files)      run repoquery --list "${ARGS[@]}" ;;
+    deps)       run repoquery --requires --resolve "${ARGS[@]}" ;;
+    rdeps)      run repoquery --whatrequires "${ARGS[@]}" ;;
+    versions)   run repoquery --queryformat '%{name}-%{evr}.%{arch}' "${ARGS[@]}" ;;
+    history)    run history "${ARGS[@]}" ;;
+    list)
+        case "${ARGS[0]:-}" in
+            installed) run list --installed ;;
+            available) run list --available ;;
+            *)         run list ;;
+        esac ;;
+    cache)
+        case "${ARGS[0]:-info}" in
+            clean) run clean all ;;
+            list)  run repoquery --cacheonly --available ;;
+            *)     echo "hud: cache info -> $DNF cache lives in /var/cache/libdnf5" >&2
+                   du -sh /var/cache/libdnf5 2>/dev/null ;;
+        esac ;;
+    pin)        run versionlock add "${ARGS[@]}" ;;
+    unpin)      run versionlock delete "${ARGS[@]}" ;;
+    pins)       run versionlock list ;;
+    service)
+        # hud service <pkg> <cmd>  ->  systemctl <cmd> <pkg>
+        pkg="${ARGS[0]:-}"; act="${ARGS[1]:-status}"
+        echo "hud: -> systemctl $act $pkg" >&2
+        exec systemctl "$act" "$pkg" ;;
+    env)
+        echo "BlackFlag now manages packages with dnf5; there is no separate prefix."
+        echo "  config:   /etc/dnf/dnf.conf, /etc/yum.repos.d/"
+        echo "  database: /var/lib/rpm (rpmdb), /var/lib/dnf (history)"
+        echo "  cache:    /var/cache/libdnf5" ;;
+    version)    exec "$DNF" --version ;;
+    help|-h|--help)
+        cat <<'EOF'
+hud is now a compatibility wrapper around dnf5.
+
+  hud install X       -> dnf5 install X
+  hud install X=1.2   -> dnf5 install X-1.2
+  hud remove X        -> dnf5 remove X
+  hud update          -> dnf5 makecache        (NOT an upgrade -- see below)
+  hud upgrade         -> dnf5 upgrade
+  hud show X          -> dnf5 info X
+  hud deps X          -> dnf5 repoquery --requires --resolve X
+  hud rdeps X         -> dnf5 repoquery --whatrequires X
+  hud pin X=1.2       -> dnf5 versionlock add X-1.2
+  hud files X         -> dnf5 repoquery --list X
+
+Note: "hud update" refreshed metadata; the dnf command that refreshes metadata
+is "makecache". "dnf5 update" is an alias for "upgrade" and changes packages.
+The mapping above preserves hud's meaning, not dnf's spelling.
+
+Anything not listed is passed straight through to dnf5.
+EOF
+        ;;
+    *)          run "$cmd" "${ARGS[@]}" ;;
+esac
