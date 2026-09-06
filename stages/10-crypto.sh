@@ -14,7 +14,7 @@ b_assuan()   { std libassuan; }
 b_ksba()     { std libksba; }
 b_npth()     { std npth; }
 b_gnupg()    { std gnupg --localstatedir=/var --sysconfdir=/etc \
-                   --enable-gpg-is-gpg2 --disable-ldap --disable-gnutls --disable-doc; }
+                   --disable-ldap --disable-gnutls --disable-doc; }
 # gpgme: C++ bindings are what libdnf5 links against; python bindings are handy for tooling.
 b_gpgme()    { std gpgme --enable-languages=cpp,python; }
 

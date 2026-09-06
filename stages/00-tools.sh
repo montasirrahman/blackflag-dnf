@@ -18,8 +18,14 @@ b_pcre2() { ./configure --prefix=/usr --enable-unicode --enable-jit --enable-pcr
 
 # NOTE: patches/cmake-3.31.6-curl-8.15-netrc.patch is applied automatically by
 # build_pkg; without it CMake will not compile against the system curl 8.15.
+# BUILD_CursesDialog=OFF: ccmake is the optional curses front-end, and ncurses'
+# curses.h redefines bool, which breaks std::integral_constant matching under
+# GCC 15 (std::function's _Local_storage no longer converts to true_type).
+# Nothing in this bootstrap drives cmake interactively, so the dialog is dropped
+# rather than patched around.
 b_cmake() { ./bootstrap --prefix=/usr --system-curl --system-zlib --system-bzip2 \
     --system-liblzma --system-expat --no-system-libarchive --parallel="$BF_JOBS" --generator=Ninja \
+    -- -DBUILD_CursesDialog=OFF \
     >>"$BF_LOGS/cmake.log" 2>&1 && ninja -j"$BF_JOBS" >>"$BF_LOGS/cmake.log" 2>&1 \
     && ninja install >>"$BF_LOGS/cmake.log" 2>&1; }
 
