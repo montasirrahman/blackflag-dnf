@@ -32,7 +32,11 @@ b_libsolv() { cm libsolv \
     -DENABLE_BZIP2_COMPRESSION=ON -DENABLE_ZSTD_COMPRESSION=ON -DENABLE_ZCHUNK_COMPRESSION=ON \
     -DMULTI_SEMANTICS=ON -DSUSE=OFF -DFEDORA=ON -DENABLE_STATIC=OFF -DDISABLE_SHARED=OFF; }
 
-b_librepo() { cm librepo -DENABLE_PYTHON=ON -DWITH_ZCHUNK=ON -DENABLE_TESTS=OFF -DENABLE_DOCS=OFF; }
+# ENABLE_SELINUX defaults ON upstream and then hard-requires libselinux.  BlackFlag
+# runs no SELinux policy and rpm was built with WITH_SELINUX=OFF, so this keeps the
+# two consistent rather than pulling in a library nothing enforces.
+b_librepo() { cm librepo -DENABLE_PYTHON=ON -DWITH_ZCHUNK=ON -DENABLE_TESTS=OFF \
+    -DENABLE_DOCS=OFF -DENABLE_SELINUX=OFF; }
 b_libcomps(){ cd libcomps && cm libcomps -DENABLE_TESTS=OFF -DENABLE_DOCS=OFF -DENABLE_PYTHON=ON; }
 b_modulemd(){ ms libmodulemd -Dwith_docs=false -Dwith_manpages=disabled -Dskip_introspection=true \
     -Dwith_py3=false -Dtest_installed_lib=false; }
@@ -42,6 +46,14 @@ b_spdlog() { cm spdlog -DBUILD_SHARED_LIBS=ON -DSPDLOG_FMT_EXTERNAL=ON \
     -DSPDLOG_BUILD_EXAMPLE=OFF -DSPDLOG_BUILD_TESTS=OFF; }
 b_toml11() { cm toml11 -Dtoml11_BUILD_TEST=OFF; }
 
+# dnf5 pulls in sdbus-c++ whenever WITH_SYSTEMD is on -- not only for the
+# optional dnf5daemon.  Keeping systemd support is worth the dependency: it is
+# what provides offline transactions, i.e. applying an upgrade during a
+# controlled reboot rather than swapping glibc and systemd underneath a running
+# system.  Codegen is off because it needs expat and only dnf5daemon uses it.
+b_sdbuscpp() { cm sdbus-cpp -DSDBUSCPP_BUILD_CODEGEN=OFF -DSDBUSCPP_BUILD_TESTS=OFF \
+    -DSDBUSCPP_BUILD_DOCS=OFF -DSDBUSCPP_BUILD_EXAMPLES=OFF; }
+
 build_pkg libyaml     'yaml-*.tar.gz'         "yaml-0.2.5"           b_libyaml
 build_pkg glib        'glib-*.tar.xz'         "glib-2.84.4"          b_glib
 build_pkg json-c      'json-c-*.tar.gz'       "json-c-json-c-0.18-20240915" b_jsonc
@@ -49,6 +61,7 @@ build_pkg zchunk      'zchunk-*.tar.gz'       "zchunk-1.5.1"         b_zchunk
 build_pkg fmt         'fmt-*.tar.gz'          "fmt-11.1.4"           b_fmt
 build_pkg spdlog      'spdlog-*.tar.gz'       "spdlog-1.15.1"        b_spdlog
 build_pkg toml11      'toml11-*.tar.gz'       "toml11-4.4.0"         b_toml11
+build_pkg sdbus-cpp   'sdbus-cpp-*.tar.gz'   "sdbus-cpp-2.1.0"      b_sdbuscpp
 build_pkg libsolv     'libsolv-*.tar.gz'      "libsolv-0.7.32"       b_libsolv
 build_pkg librepo     'librepo-*.tar.gz'      "librepo-1.20.0"       b_librepo
 build_pkg libcomps    'libcomps-*.tar.gz'     "libcomps-0.1.21"      b_libcomps

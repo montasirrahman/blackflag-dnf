@@ -27,6 +27,7 @@
 30|fmt|11.1.4|https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
 30|spdlog|1.15.1|https://github.com/gabime/spdlog/archive/refs/tags/v1.15.1.tar.gz
 30|toml11|4.4.0|https://github.com/ToruNiina/toml11/archive/refs/tags/v4.4.0.tar.gz
+30|sdbus-cpp|2.1.0|https://github.com/Kistler-Group/sdbus-cpp/archive/refs/tags/v2.1.0.tar.gz
 30|sqlite|3500400|https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz
 40|dnf5|5.2.13.0|https://github.com/rpm-software-management/dnf5/archive/refs/tags/5.2.13.0.tar.gz
 50|createrepo_c|1.2.1|https://github.com/rpm-software-management/createrepo_c/archive/refs/tags/1.2.1.tar.gz

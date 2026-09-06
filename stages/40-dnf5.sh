@@ -4,8 +4,10 @@
 
 b_dnf5() {
     local L="$BF_LOGS/dnf5.log"
-    # The dbus daemon (dnf5daemon) needs sdbus-c++, which is not part of the base system;
-    # it is optional and off here.  Man pages need pandoc, also off.
+    # The dbus daemon (dnf5daemon) needs sdbus-c++, which is not part of the base
+    # system; it is optional and off here.  Man pages need pandoc, also off.
+    # WITH_PLUGIN_APPSTREAM requires libappstream and only serves GUI software
+    # centres, which BlackFlag does not ship -- off, like the daemon it pairs with.
     cmake -S . -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_INSTALL_LIBDIR=lib \
@@ -25,6 +27,7 @@ b_dnf5() {
         -DWITH_SYSTEMD=ON \
         -DWITH_PLUGIN_ACTIONS=ON \
         -DWITH_PLUGIN_RHSM=OFF \
+        -DWITH_PLUGIN_APPSTREAM=OFF \
         -DWITH_PYTHON_PLUGINS_LOADER=ON \
         -DWITH_PYTHON3=ON \
         -DWITH_PERL5=OFF \
