@@ -36,6 +36,9 @@ sect "4. macros"
 chk "%dist = .bf1"    "[ \"\$(rpm --eval '%{?dist}')\" = '.bf1' ]"
 chk "%_vendor set"    "[ \"\$(rpm --eval '%{_vendor}')\" = 'blackflag' ]"
 chk "payload is zstd" "rpm --eval '%_binary_payload' | grep -q zstd"
+# On BlackFlag /usr/lib64 does not exist; rpm's x86_64 default would send every
+# library to a directory the linker never searches.
+chk "%_libdir = /usr/lib" "[ \"\$(rpm --eval '%{_libdir}')\" = '/usr/lib' ]"
 
 sect "5. signing key"
 chk "secret key present" "gpg --list-secret-keys 'BlackFlag Linux Package Signing Key'"

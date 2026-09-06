@@ -13,6 +13,7 @@
 10|npth|1.8|https://www.gnupg.org/ftp/gcrypt/npth/npth-1.8.tar.bz2
 10|gnupg|2.4.8|https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.4.8.tar.bz2
 10|gpgme|1.24.3|https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-1.24.3.tar.bz2
+20|elfutils|0.193|https://sourceware.org/elfutils/ftp/0.193/elfutils-0.193.tar.bz2
 20|lua|5.4.8|https://www.lua.org/ftp/lua-5.4.8.tar.gz
 20|rpm|4.20.1|https://ftp.osuosl.org/pub/rpm/releases/rpm-4.20.x/rpm-4.20.1.tar.bz2
 30|libyaml|0.2.5|https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz

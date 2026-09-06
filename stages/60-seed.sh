@@ -28,6 +28,14 @@ s60_macros() {
 %bugurl                 https://blackflag.com.bd/bugs
 %_buildhost             build.blackflag.com.bd
 
+# BlackFlag inherits LFS's layout: there is no /usr/lib64, and /lib64 holds only
+# the ld-linux symlinks the ELF interpreter path requires.  Every real library
+# lives in /usr/lib.  rpm's x86_64 platform macros default %_lib to lib64, so
+# without this override every library package would install into a directory
+# that is not on the linker path and nothing would resolve at runtime.
+%_lib                   lib
+%_libdir                %{_exec_prefix}/%{_lib}
+
 # Compression: zstd for payloads - fast to decompress, small, and supported
 # by every tool in this stack (rpm, libsolv, createrepo_c).
 %_source_payload        w19.zstdio

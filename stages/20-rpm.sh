@@ -6,6 +6,23 @@
 LUA_VER=5.4.8
 LUA_MAJ=5.4
 
+# LFS installs only libelf out of elfutils, but rpm requires libdw as well (it is
+# a hard pkg_check_modules REQUIRED when WITH_LIBDW is on, which is the default,
+# and it is what makes debuginfo generation possible).  Build the same elfutils
+# version LFS already installed so libelf is replaced by an identical copy rather
+# than up- or down-graded underneath the running system.
+b_elfutils() {
+    local L="$BF_LOGS/elfutils.log"
+    ./configure --prefix=/usr --libdir=/usr/lib \
+        --disable-debuginfod --enable-libdebuginfod=dummy >>"$L" 2>&1 || return 1
+    make -j"$BF_JOBS" >>"$L" 2>&1 || return 1
+    local m
+    for m in libelf libdw libdwelf libdwfl libebl; do
+        make -C "$m" install >>"$L" 2>&1 || return 1
+    done
+    install -m644 config/libelf.pc config/libdw.pc /usr/lib/pkgconfig/ >>"$L" 2>&1 || return 1
+}
+
 b_lua() {
     local L="$BF_LOGS/lua.log"
     # Upstream lua ships no shared-library target; build PIC objects and link one by hand.
@@ -76,6 +93,7 @@ b_rpm() {
     rpmdb --initdb >>"$L" 2>&1 || return 1
 }
 
+build_pkg elfutils 'elfutils-*.tar.bz2' "elfutils-0.193" b_elfutils
 build_pkg lua 'lua-*.tar.gz'    "lua-$LUA_VER" b_lua
 build_pkg rpm 'rpm-*.tar.bz2'   "rpm-4.20.1"   b_rpm
 msg "stage 20 complete"
