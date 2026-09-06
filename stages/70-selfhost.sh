@@ -15,6 +15,8 @@ BF_LOCALREPO="${BF_LOCALREPO:-/srv/blackflag/repo/local}"
 # name | version | build subdirectory | install command
 PKGS=(
   "curl|8.15.0|curl-8.15.0|make install"
+  "elfutils|0.193|elfutils-0.193|make install"
+  "sdbus-cpp|2.1.0|sdbus-cpp-2.1.0|ninja -C build install"
   "git|2.51.0|git-2.51.0|make NO_TCLTK=1 install"
   "pcre2|10.45|pcre2-10.45|make install"
   "cmake|3.31.6|cmake-3.31.6|ninja install"
@@ -27,7 +29,7 @@ PKGS=(
   "npth|1.8|npth-1.8|make install"
   "gnupg|2.4.8|gnupg-2.4.8|make install"
   "gpgme|1.24.3|gpgme-1.24.3|make install"
-  "rpm|4.20.1|rpm-4.20.1|ninja -C build install"
+  "rpm|4.19.1.1|rpm-4.19.1.1|make -C _build install"
   "libyaml|0.2.5|yaml-0.2.5|make install"
   "glib2|2.84.4|glib-2.84.4|ninja -C build install"
   "json-c|0.18|json-c-json-c-0.18-20240915|ninja -C build install"

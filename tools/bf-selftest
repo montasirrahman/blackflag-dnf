@@ -44,6 +44,9 @@ sect "5. signing key"
 chk "secret key present" "gpg --list-secret-keys 'BlackFlag Linux Package Signing Key'"
 chk "public key exported" "[ -s /etc/pki/rpm-gpg/RPM-GPG-KEY-blackflag-1.0 ]"
 chk "key imported into rpmdb" "rpm -qa 'gpg-pubkey*' | grep -q ."
+# rpm links a stub OpenPGP backend without complaining if configured wrong, so
+# check the symbol is really there rather than trusting the build succeeded.
+chk "librpmio has real OpenPGP" "nm -D /usr/lib/librpmio.so.10 | grep -q pgpParsePkts"
 
 sect "6. dnf5 configuration"
 chk "dnf5 runs"            "dnf5 --version"

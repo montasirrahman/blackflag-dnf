@@ -59,8 +59,28 @@ PC
 
 b_rpm() {
     local L="$BF_LOGS/rpm.log"
-    # rpmdb lives at /var/lib/rpm with the sqlite backend (the rpm >= 4.16 default).
-    cmake -S . -B build -G Ninja \
+    # Why 4.19 and not 4.20+:
+    #   rpm 4.20 removed the in-tree OpenPGP parser.  Its only remaining backend is
+    #   rpm-sequoia, which needs a full Rust toolchain and pulls ~100 crates from
+    #   crates.io at build time.  BlackFlag has no Rust, and a from-source
+    #   distribution should not acquire one just to verify signatures.
+    #
+    #   The failure mode if you get this wrong is quiet and severe: with
+    #   WITH_SEQUOIA=OFF and no legacy backend available, rpm links rpmpgp_dummy.c
+    #   and builds happily -- with NO OpenPGP support at all.  No key import, no
+    #   signature verification, no signing, and no error until you try.
+    #
+    #   4.19.1.1 is the last release carrying rpmpgp_internal.c.  It is marked
+    #   DEPRECATED upstream and defaults to OFF, so WITH_INTERNAL_OPENPGP=ON is
+    #   required and is not optional for BlackFlag.
+    #   Migrating to sequoia is a roadmap item, gated on BlackFlag having Rust.
+    #
+    # Two build-system quirks, both specific to 4.19:
+    #   - the source tree contains a directory literally named build/ (librpmbuild
+    #     lives there), so the out-of-source build dir must NOT be called "build"
+    #   - the Ninja generator fails with "multiple rules generate rpm-<ver>.tar.bz2"
+    #     from the dist target; Unix Makefiles is fine
+    cmake -S . -B _build \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_BUILD_TYPE=Release \
@@ -72,9 +92,9 @@ b_rpm() {
         -DENABLE_OPENMP=OFF \
         -DENABLE_TESTSUITE=OFF \
         -DENABLE_NLS=ON \
-        -DWITH_CRYPTO=openssl \
+        -DENABLE_SQLITE=ON \
         -DWITH_INTERNAL_OPENPGP=ON \
-        -DWITH_SEQUOIA=OFF \
+        -DWITH_OPENSSL=ON \
         -DWITH_ACL=ON \
         -DWITH_CAP=ON \
         -DWITH_AUDIT=OFF \
@@ -85,15 +105,21 @@ b_rpm() {
         -DWITH_DBUS=OFF \
         -DWITH_READLINE=ON \
         -DWITH_ARCHIVE=ON \
-        -DWITH_DOXYGEN=OFF \
         >>"$L" 2>&1 || return 1
-    ninja -C build -j"$BF_JOBS" >>"$L" 2>&1 || return 1
-    ninja -C build install       >>"$L" 2>&1 || return 1
+    make -C _build -j"$BF_JOBS" >>"$L" 2>&1 || return 1
+    make -C _build install       >>"$L" 2>&1 || return 1
+
+    # Fail loudly rather than shipping an rpm that cannot verify anything.
+    if ! nm -D /usr/lib/librpmio.so.10 2>/dev/null | grep -q pgpParsePkts; then
+        echo "librpmio has no OpenPGP support - refusing to continue" >>"$L"
+        return 1
+    fi
+
     install -d /var/lib/rpm /var/cache/rpm /var/lib/rpm/backup
     rpmdb --initdb >>"$L" 2>&1 || return 1
 }
 
 build_pkg elfutils 'elfutils-*.tar.bz2' "elfutils-0.193" b_elfutils
 build_pkg lua 'lua-*.tar.gz'    "lua-$LUA_VER" b_lua
-build_pkg rpm 'rpm-*.tar.bz2'   "rpm-4.20.1"   b_rpm
+build_pkg rpm 'rpm-4.19*.tar.bz2' "rpm-4.19.1.1" b_rpm
 msg "stage 20 complete"
