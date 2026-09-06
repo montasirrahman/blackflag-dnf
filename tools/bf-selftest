@@ -1,0 +1,109 @@
+#!/bin/bash
+# bf-selftest - verify that the RPM/DNF5 stack actually works end to end.
+#
+# Builds a throwaway package, publishes it to a scratch repository, installs it
+# through dnf5, verifies file ownership, then removes it and cleans up.  This is
+# the check that the bootstrap produced something usable rather than merely
+# something that compiled.
+set -u
+PASS=0; FAIL=0
+C_G='\033[0;32m'; C_R='\033[0;31m'; C_Y='\033[1;33m'; C_N='\033[0m'
+chk()  { if eval "$2" >/dev/null 2>&1; then printf "  ${C_G}pass${C_N}  %s\n" "$1"; PASS=$((PASS+1));
+         else printf "  ${C_R}FAIL${C_N}  %s\n" "$1"; FAIL=$((FAIL+1)); fi; }
+sect() { printf "\n\033[1m%s\033[0m\n" "$1"; }
+
+sect "1. binaries present"
+for b in rpm rpmdb rpmkeys rpmsign rpmbuild rpmspec dnf5 createrepo_c gpg; do
+    chk "$b" "command -v $b"
+done
+chk "dnf -> dnf5 symlink" "[ -L /usr/bin/dnf ]"
+
+sect "2. libraries linked"
+for l in librpm librpmio libdnf5 libsolv librepo libcomps libmodulemd; do
+    chk "$l" "ls /usr/lib/${l}*.so* "
+done
+chk "dnf5 resolves all its shared libs" "! ldd \$(command -v dnf5) | grep -q 'not found'"
+
+sect "3. rpm database"
+chk "rpmdb exists"        "[ -s /var/lib/rpm/rpmdb.sqlite ] || [ -s /var/lib/rpm/Packages ]"
+chk "rpm -qa runs"        "rpm -qa"
+chk "blackflag-release installed" "rpm -q blackflag-release"
+chk "blackflag-base installed"    "rpm -q blackflag-base"
+chk "base shim provides glibc"    "rpm -q --whatprovides glibc"
+chk "base shim provides libc.so"  "rpm -q --whatprovides 'libc.so.6()(64bit)'"
+
+sect "4. macros"
+chk "%dist = .bf1"    "[ \"\$(rpm --eval '%{?dist}')\" = '.bf1' ]"
+chk "%_vendor set"    "[ \"\$(rpm --eval '%{_vendor}')\" = 'blackflag' ]"
+chk "payload is zstd" "rpm --eval '%_binary_payload' | grep -q zstd"
+
+sect "5. signing key"
+chk "secret key present" "gpg --list-secret-keys 'BlackFlag Linux Package Signing Key'"
+chk "public key exported" "[ -s /etc/pki/rpm-gpg/RPM-GPG-KEY-blackflag-1.0 ]"
+chk "key imported into rpmdb" "rpm -qa 'gpg-pubkey*' | grep -q ."
+
+sect "6. dnf5 configuration"
+chk "dnf5 runs"            "dnf5 --version"
+chk "dnf.conf present"     "[ -s /etc/dnf/dnf.conf ]"
+chk "releasever resolves"  "[ \"\$(cat /etc/dnf/vars/releasever)\" = '1.0' ]"
+chk "repolist runs"        "dnf5 repolist --all"
+chk "local repo enabled"   "dnf5 repolist | grep -qi blackflag-local"
+
+sect "7. build + publish + install round trip"
+TMPTOP=$(mktemp -d); TMPREPO=$(mktemp -d)
+export HOME_ORIG="$HOME"
+mkdir -p "$TMPTOP"/{SPECS,SOURCES,BUILD,BUILDROOT,RPMS,SRPMS}
+cat > "$TMPTOP/SPECS/bf-selftest-pkg.spec" <<'SPEC'
+Name:           bf-selftest-pkg
+Version:        1.0
+Release:        1%{?dist}
+Summary:        Throwaway package used by bf-selftest
+License:        MIT
+BuildArch:      noarch
+%description
+Created and removed by bf-selftest. If you are seeing this installed, the
+self-test did not finish cleanly; removing it is safe.
+%install
+install -Dm644 /dev/null %{buildroot}%{_datadir}/bf-selftest/marker
+echo working > %{buildroot}%{_datadir}/bf-selftest/marker
+%files
+%{_datadir}/bf-selftest/marker
+%changelog
+* Sat Sep 06 2026 selftest <build@blackflag.com.bd> - 1.0-1
+- throwaway
+SPEC
+chk "rpmbuild produces an rpm" "rpmbuild --define '_topdir $TMPTOP' -bb '$TMPTOP/SPECS/bf-selftest-pkg.spec'"
+RPMFILE=$(ls "$TMPTOP"/RPMS/*/bf-selftest-pkg-1.0-*.rpm 2>/dev/null | head -1)
+chk "rpm file exists"      "[ -f '$RPMFILE' ]"
+chk "release carries .bf1" "echo '$RPMFILE' | grep -q '\.bf1\.'"
+chk "rpmsign signs it"     "rpmsign --addsign '$RPMFILE'"
+chk "signature verifies"   "rpmkeys --checksig '$RPMFILE' | grep -qi 'digests signatures OK'"
+
+mkdir -p "$TMPREPO/Packages" && cp "$RPMFILE" "$TMPREPO/Packages/" 2>/dev/null
+chk "createrepo_c indexes it" "createrepo_c --quiet '$TMPREPO'"
+chk "repomd.xml written"      "[ -s '$TMPREPO/repodata/repomd.xml' ]"
+chk "repomd signs"            "gpg --batch --yes --detach-sign --armor '$TMPREPO/repodata/repomd.xml'"
+
+cat > /etc/yum.repos.d/bf-selftest.repo <<EOF
+[bf-selftest]
+name=bf-selftest scratch repo
+baseurl=file://$TMPREPO
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+EOF
+chk "dnf5 sees the repo"       "dnf5 --refresh repolist | grep -q bf-selftest"
+chk "dnf5 finds the package"   "dnf5 repoquery --repo=bf-selftest bf-selftest-pkg | grep -q bf-selftest-pkg"
+chk "dnf5 installs it"         "dnf5 -y --repo=bf-selftest install bf-selftest-pkg"
+chk "file landed on disk"      "grep -q working /usr/share/bf-selftest/marker"
+chk "rpm knows who owns it"    "rpm -qf /usr/share/bf-selftest/marker | grep -q bf-selftest-pkg"
+chk "dnf5 history recorded it" "dnf5 history list | grep -q ."
+chk "dnf5 removes it"          "dnf5 -y remove bf-selftest-pkg"
+chk "file is gone"             "[ ! -e /usr/share/bf-selftest/marker ]"
+
+rm -f /etc/yum.repos.d/bf-selftest.repo
+rm -rf "$TMPTOP" "$TMPREPO"
+
+sect "result"
+printf "  %d passed, %d failed\n\n" "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ] || exit 1

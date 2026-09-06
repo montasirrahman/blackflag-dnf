@@ -1,6 +1,7 @@
 # Generated from blackflag-base.spec.in by stages/60-seed.sh -- do not edit the
-# generated copy.  The @PROVIDES@ marker is replaced with the output of
-# packaging/gen-base-provides.sh, which reads the live system.
+# generated copy.  The PROVIDES marker below is replaced with the output of
+# packaging/gen-base-provides.sh, which reads the live system.  (The marker token is
+# spelled out only once below, so that this comment does not get substituted too.)
 #
 # This package intentionally owns NO files.  It is installed with `rpm -i --justdb`
 # so that the rpm database reflects the LFS userland that was built before rpm
