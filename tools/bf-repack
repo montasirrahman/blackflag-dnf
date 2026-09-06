@@ -13,6 +13,12 @@
 # generates Provides/Requires from the binaries as usual, and the bootstrap stack
 # becomes ordinary RPM content that dnf can upgrade.
 #
+# The install command may contain the token @BUILDROOT@, which is replaced with the
+# staging directory.  Use it for build systems that honour neither DESTDIR nor a
+# separate prefix at install time -- bzip2's Makefile, for instance, has no DESTDIR
+# support at all:
+#     bf-repack bzip2 1.0.8 <dir> make install "PREFIX=@BUILDROOT@/usr"
+#
 # BF_REPACK_EXCLUDE may hold whitespace-separated globs (rooted at /) to drop from
 # the package before %files is generated.  Use it for optional components whose
 # dependencies are not installed -- git-svn needs perl(SVN::Core), git-p4 needs
@@ -36,11 +42,44 @@ INSTALL_CMD=("$@")
 TOP="${HOME}/rpmbuild"
 mkdir -p "$TOP"/{SPECS,SOURCES,BUILD,BUILDROOT,RPMS,SRPMS}
 BR=$(mktemp -d "/var/tmp/bf-repack-${name}-XXXXXX")
-trap 'rm -rf "$BR"' EXIT
+
+# GNU make ranks variable sources: command line > makefile > environment.  A
+# Makefile containing a bare "DESTDIR =" -- readline and many hand-written ones do
+# -- therefore OVERRIDES a DESTDIR taken from the environment, and `make install`
+# writes straight into /usr instead of the staging directory.  Passing it as a
+# command-line argument outranks the makefile and is the only reliable way.
+# Environment is kept as well, for ninja and cmake install scripts, which read it
+# from there and take no make-style arguments.
+INSTALL_ARGS=()
+for a in "${INSTALL_CMD[@]}"; do INSTALL_ARGS+=("${a//@BUILDROOT@/$BR}"); done
+case "${INSTALL_ARGS[0]}" in
+    make|gmake) INSTALL_ARGS+=("DESTDIR=$BR") ;;
+esac
+
+# Tripwire.  Compare ctime, not mtime: an install that preserves timestamps
+# (install -p, cp -p) can write a file whose mtime is older than the marker, but
+# ctime is set by the kernel on write and cannot be forged.
+MARKER=$(mktemp); trap 'rm -rf "$BR" "$MARKER"' EXIT
 
 echo "==> staging install into $BR"
-( cd "$dir" && DESTDIR="$BR" "${INSTALL_CMD[@]}" ) >/dev/null 2>&1 \
-    || { cd "$dir" && DESTDIR="$BR" "${INSTALL_CMD[@]}" 2>&1 | tail -20; exit 1; }
+( cd "$dir" && DESTDIR="$BR" "${INSTALL_ARGS[@]}" ) >/dev/null 2>&1 \
+    || { cd "$dir" && DESTDIR="$BR" "${INSTALL_ARGS[@]}" 2>&1 | tail -20; exit 1; }
+
+GUARD_DIRS="${BF_REPACK_GUARD_DIRS:-/usr /etc /bin /sbin /lib /lib64 /opt}"
+leaked=$(find $GUARD_DIRS -xdev \( -type f -o -type l \) \
+             -newercm "$MARKER" 2>/dev/null \
+         | grep -vE '^/usr/lib/sysimage/|^/etc/ld\.so\.cache$' | head -40)
+if [ -n "$leaked" ]; then
+    echo "" >&2
+    echo "REFUSING TO CONTINUE: the install wrote OUTSIDE the staging directory." >&2
+    echo "The live system has been modified by '${INSTALL_CMD[*]}':" >&2
+    echo "$leaked" | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "This build system ignores DESTDIR.  Re-run with an explicit staging" >&2
+    echo "prefix, e.g.  ... make install \"PREFIX=@BUILDROOT@/usr\"" >&2
+    echo "Restore the listed paths before retrying." >&2
+    exit 2
+fi
 
 # libtool archives and static libs are build-time leftovers; they bloat packages
 # and .la files actively break later builds by hardcoding paths.

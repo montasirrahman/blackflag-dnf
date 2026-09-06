@@ -1,0 +1,51 @@
+# BlackFlag base-system conversion manifest.
+#
+# tier|name|version|url
+#
+# Tier 1  leaf libraries and small tools.  Nothing in the running system breaks if
+#         one of these is briefly replaced by an identical rebuild.
+# Tier 2  userland utilities.  Replacing these live is survivable but noticeable;
+#         convert them one at a time and check the system after each.
+# Tier 3  glibc, gcc, binutils, systemd, the kernel, perl, python.  Replacing any
+#         of these on a running system can leave it unbootable.  They need an
+#         offline transaction or a rebuild host, not `rpm -U` on a live box.
+#         Listed for completeness; stage 80 refuses to touch them.
+#
+# Versions MUST match what is installed.  A conversion is meant to record what is
+# already there, not to upgrade it -- doing both at once means a breakage cannot
+# be attributed to either.
+1|zlib|1.3.1|https://zlib.net/fossils/zlib-1.3.1.tar.gz
+1|bzip2|1.0.8|https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+1|xz|5.8.1|https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz
+1|zstd|1.5.7|https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+1|lz4|1.10.0|https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz
+1|expat|2.7.1|https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz
+1|libffi|3.5.2|https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz
+1|popt|1.19|http://ftp.rpm.org/popt/releases/popt-1.x/popt-1.19.tar.gz
+1|readline|8.3|https://ftp.gnu.org/gnu/readline/readline-8.3.tar.gz
+1|sqlite|3.50.4|https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz
+1|libarchive|3.8.1|https://github.com/libarchive/libarchive/releases/download/v3.8.1/libarchive-3.8.1.tar.xz
+1|libcap|2.76|https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz
+1|attr|2.5.2|https://download.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz
+1|acl|2.3.2|https://download.savannah.gnu.org/releases/acl/acl-2.3.2.tar.xz
+1|file|5.46|https://astron.com/pub/file/file-5.46.tar.gz
+1|gmp|6.3.0|https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+1|mpfr|4.2.2|https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+1|libxcrypt|4.4.38|https://github.com/besser82/libxcrypt/releases/download/v4.4.38/libxcrypt-4.4.38.tar.xz
+2|gzip|1.14|https://ftp.gnu.org/gnu/gzip/gzip-1.14.tar.xz
+2|tar|1.35|https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz
+2|diffutils|3.12|https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz
+2|patch|2.8|https://ftp.gnu.org/gnu/patch/patch-2.8.tar.xz
+2|findutils|4.10.0|https://ftp.gnu.org/gnu/findutils/findutils-4.10.0.tar.xz
+2|sed|4.9|https://ftp.gnu.org/gnu/sed/sed-4.9.tar.xz
+2|grep|3.12|https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz
+2|m4|1.4.20|https://ftp.gnu.org/gnu/m4/m4-1.4.20.tar.xz
+2|make|4.4.1|https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
+3|glibc|2.42|https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz
+3|gcc|15.2.0|https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz
+3|binutils|2.45|https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz
+3|bash|5.3|https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz
+3|coreutils|9.7|https://ftp.gnu.org/gnu/coreutils/coreutils-9.7.tar.xz
+3|systemd|257.8|https://github.com/systemd/systemd/archive/refs/tags/v257.8.tar.gz
+3|perl|5.42.0|https://www.cpan.org/src/5.0/perl-5.42.0.tar.xz
+3|python3|3.13.7|https://www.python.org/ftp/python/3.13.7/Python-3.13.7.tar.xz
