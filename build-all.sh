@@ -13,7 +13,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 [ "$(id -u)" -eq 0 ] || die "must run as root (installs into /usr)"
 
-ALL="00 10 20 30 40 50 60"
+ALL="00 10 20 30 40 50 60 70"
 WANT="${*:-$ALL}"
 
 start=$(date +%s)

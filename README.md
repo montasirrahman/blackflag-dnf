@@ -35,6 +35,7 @@ re-run. Delete a stamp to force a rebuild.
 | `40-dnf5` | **libdnf5 + dnf5** |
 | `50-repotools` | createrepo_c |
 | `60-seed` | rpm macros, GPG key, `blackflag-release`, `blackflag-base`, repo config |
+| `70-selfhost` | repackage the bootstrap stack as RPMs so dnf can upgrade dnf |
 
 ## Tools installed
 
@@ -44,6 +45,9 @@ re-run. Delete a stamp to force a rebuild.
 | `bf-newpkg` | scaffold a spec file that follows BlackFlag conventions |
 | `hud2rpm` | convert legacy `.hud` packages into RPMs |
 | `hud-compat` | translate `hud` command lines into `dnf5` ones |
+| `bf-selftest` | end-to-end check: build → sign → publish → install → remove |
+| `bf-lfs-audit` | how much of the filesystem RPM actually owns |
+| `bf-repack` | turn an already-built tree into an RPM without recompiling |
 
 ## Layout
 
