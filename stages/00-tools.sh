@@ -16,6 +16,8 @@ b_pcre2() { ./configure --prefix=/usr --enable-unicode --enable-jit --enable-pcr
     >>"$BF_LOGS/pcre2.log" 2>&1 && make -j"$BF_JOBS" >>"$BF_LOGS/pcre2.log" 2>&1 \
     && make install >>"$BF_LOGS/pcre2.log" 2>&1; }
 
+# NOTE: patches/cmake-3.31.6-curl-8.15-netrc.patch is applied automatically by
+# build_pkg; without it CMake will not compile against the system curl 8.15.
 b_cmake() { ./bootstrap --prefix=/usr --system-curl --system-zlib --system-bzip2 \
     --system-liblzma --system-expat --no-system-libarchive --parallel="$BF_JOBS" --generator=Ninja \
     >>"$BF_LOGS/cmake.log" 2>&1 && ninja -j"$BF_JOBS" >>"$BF_LOGS/cmake.log" 2>&1 \

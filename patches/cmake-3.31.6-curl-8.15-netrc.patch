@@ -1,0 +1,21 @@
+curl 8.15 turned CURL_NETRC_IGNORED / _OPTIONAL / _REQUIRED from members of the
+CURL_NETRC_OPTION enum into plain `long` macros (0L/1L/2L), leaving only
+CURL_NETRC_LAST in the enum. Assigning those macros to a CURL_NETRC_OPTION
+variable is then an invalid long->enum conversion, so CMake 3.31.6 will not build
+against a system curl of that vintage.
+
+CURLOPT_NETRC is a varargs long option, so holding the value in a `long` is both
+correct and what curl itself expects; comparisons against the remaining
+enumerator still work through the usual integral promotion.
+
+--- a/Source/cmCurl.cxx
++++ b/Source/cmCurl.cxx
+@@ -170,7 +170,7 @@
+                                  const std::string& netrc_file)
+ {
+   std::string e;
+-  CURL_NETRC_OPTION curl_netrc_level = CURL_NETRC_LAST;
++  long curl_netrc_level = CURL_NETRC_LAST;
+   ::CURLcode res;
+ 
+   if (!netrc_level.empty()) {

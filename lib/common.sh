@@ -40,6 +40,18 @@ run() {
     fi
 }
 
+# apply_patches <srcdir> <prefix>  - apply patches/<prefix>*.patch, in sorted order
+apply_patches() {
+    local d="$1" prefix="$2" p
+    local pdir="${BF_PATCHES:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/patches}"
+    [ -d "$pdir" ] || return 0
+    for p in $(ls "$pdir/${prefix}"*.patch 2>/dev/null | sort); do
+        msg "  patch: $(basename "$p")"
+        patch -d "$d" -p1 -N -r - --no-backup-if-mismatch < "$p" >/dev/null 2>&1 \
+            || warn "  patch did not apply cleanly (may already be applied): $(basename "$p")"
+    done
+}
+
 # build_pkg <stamp> <tarball-glob> <srcdir> <builder-function>
 build_pkg() {
     local stamp="$1" glob="$2" dir="$3" fn="$4" d
@@ -47,6 +59,7 @@ build_pkg() {
     msg "building $stamp"
     : > "$BF_LOGS/$stamp.log"
     d=$(unpack "$glob" "$dir")
+    apply_patches "$d" "$dir"
     ( cd "$d" && "$fn" "$d" ) || die "$stamp"
     ldconfig
     mark_done "$stamp"
