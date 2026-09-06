@@ -20,6 +20,7 @@ The base install was surveyed before any work began. Findings:
 | Missing build tools | curl, git, cmake, swig, libxml2 |
 | Missing libraries | glib2, pcre2, libyaml, json-c, libxml2, the whole GnuPG stack, libsolv, librepo, libcomps, libmodulemd, zchunk, fmt, spdlog, toml11 |
 | Present and reusable | popt, libarchive, libelf, libmagic, libcap, libacl, sqlite3, openssl 3.5.2, expat, libffi, zlib/xz/bz2/zstd/lz4, icu, readline, ncurses, systemd, dbus |
+| Present but incomplete | elfutils — LFS installs `libelf` only, and rpm hard-requires `libdw` |
 | Resources | 926 GB free, 2 cores, 3.8 GB RAM + 4 GB swap, outbound HTTPS working |
 
 ### What `hud` is and is not
@@ -64,11 +65,33 @@ be able to replace glibc, systemd, and the kernel. Prefix-isolating it would rep
 `hud` is **not removed**. It keeps working against `/opt/hud` during the transition
 (see §7).
 
-### 2.3 Optional components turned off, and why
+### 2.3 Layout: `%_libdir` is `/usr/lib`, not `/usr/lib64`
+
+BlackFlag inherits LFS's layout. `/usr/lib64` does not exist, and `/lib64` holds
+only the `ld-linux-x86-64.so.2` symlinks that the ELF interpreter path requires.
+Every real library lives in `/usr/lib`.
+
+rpm's `x86_64-linux` platform macros set `%_lib` to `lib64`. Left alone, every
+library package would install into a directory that is not on the linker path,
+and nothing would say so at build time — the failure surfaces later, at runtime,
+in whatever tried to link against it. `macros.blackflag` therefore pins:
+
+```
+%_lib      lib
+%_libdir   %{_exec_prefix}/%{_lib}
+```
+
+`bf-selftest` asserts this, because it is the kind of setting that silently
+un-sets itself when someone regenerates macros from an upstream template.
+
+### 2.4 Optional components turned off, and why
 
 | Off | Reason |
 |---|---|
-| `dnf5daemon` (client + server) | requires `sdbus-c++`, not in base; the D-Bus API is only needed by GUI front ends (PackageKit, Cockpit). Can be added later without rebuilding anything else. |
+| `dnf5daemon` (client + server) | the D-Bus API is only needed by GUI front ends (PackageKit, Cockpit). Can be added later without rebuilding anything else. |
+| `WITH_PLUGIN_APPSTREAM` | requires `libappstream`; only feeds GUI software centres, which BlackFlag does not ship |
+| `ccmake` | ncurses' `curses.h` redefines `bool`, breaking `std::integral_constant` matching under GCC 15. Nothing here drives cmake interactively. |
+| librepo `ENABLE_SELINUX` | no SELinux policy is enforced, and rpm was built `WITH_SELINUX=OFF` |
 | man/html docs | require `pandoc` (a Haskell toolchain) |
 | `WITH_PLUGIN_RHSM` | Red Hat subscription-manager integration; meaningless here |
 | rpm `WITH_SEQUOIA` | pulls in a Rust toolchain; rpm's internal OpenPGP parser + OpenSSL covers signing/verification |
