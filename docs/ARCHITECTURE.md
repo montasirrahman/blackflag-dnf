@@ -312,18 +312,68 @@ The migration is one-directional and gradual:
 
 ---
 
-## 9. Roadmap
+## 9. Status
 
-- [x] Survey the base system, decide dnf5 vs dnf4
-- [x] Stage scripts for the full bootstrap chain
-- [x] Stage scripts for seeding (60) and self-hosting (70)
+Built and working on `blackflag` as of 2026-09-06:
+
+```
+rpm 4.19.1.1     dnf5 5.2.13.0     createrepo_c 1.2.1
+32 packages installed, all signed
+bf-selftest: 53 passed, 0 failed
+filesystem coverage: 11% RPM-owned
+```
+
+The full round trip is verified: `rpmbuild` -> `rpmsign` -> `createrepo_c` ->
+`dnf5 install` with `gpgcheck=1` **and** `repo_gpgcheck=1` -> `rpm -qf` reports
+correct ownership -> `dnf5 remove`.
+
+The package manager owns itself: `rpm -qf $(command -v dnf5)` answers
+`dnf5-5.2.13.0-1.bf1.x86_64`.
+
+## 10. Roadmap
+
+- [x] Survey the base, decide dnf5 vs dnf4
+- [x] Full bootstrap chain, stages 00-70
 - [x] Tooling: `bf-repo`, `bf-newpkg`, `bf-selftest`, `bf-lfs-audit`, `bf-repack`, `hud2rpm`, `hud-compat`
-- [ ] Build stages 00–50 (in progress)
-- [ ] First working `dnf5 install` from a local repo (`bf-selftest`)
-- [ ] Stage 70: bootstrap stack owned by rpm
-- [ ] Publish bootstrap repo to GitHub Pages
-- [ ] `hud2rpm` converter
-- [ ] Convert the LFS base to RPMs (§5C), retire `blackflag-base`
-- [ ] Build-host isolation (mock-equivalent) so packages build in clean roots
-- [ ] `sdbus-c++` + `dnf5daemon` for GUI/PackageKit integration
-- [ ] `dnf5` module/appstream metadata, delta RPMs
+- [x] `rpmbuild` verified end to end
+- [x] Signing key, macros, `blackflag-release`, rpmdb shim
+- [x] Working `dnf5 install` from a signed local repo
+- [x] Bootstrap stack repackaged as RPMs and self-owned
+- [ ] Publish the bootstrap repo to GitHub Pages (workflow written, Pages not yet enabled)
+- [ ] Stand up `repo.blackflag.com.bd`
+- [ ] Convert the LFS base to RPMs (S5C) - coverage 11% -> 100%, then retire `blackflag-base`
+- [ ] Build-host isolation (a `mock` equivalent) so `BuildRequires` is actually enforced
+- [ ] Move the production signing key off the build host
+- [ ] `dnf5daemon` for PackageKit/GUI integration (sdbus-c++ is already built)
+- [ ] Migrate to rpm 4.20+/sequoia once BlackFlag has a Rust toolchain (S11)
+- [ ] `hud2rpm` conversion of existing hud packages; retire hud to the shim
+- [ ] debuginfo subpackages, delta RPMs, comps groups
+
+## 11. Known limitations, stated plainly
+
+**rpm is 4.19, not 4.20+.** rpm 4.20 removed the in-tree OpenPGP parser; its only
+remaining backend is `rpm-sequoia`, which needs a Rust toolchain and pulls roughly
+a hundred crates from crates.io at build time. 4.19.1.1 is the last release
+shipping `rpmpgp_internal.c`, which upstream marks deprecated. This is a dead end
+with a known expiry date, not a permanent choice.
+
+*Watch the failure mode:* with `WITH_SEQUOIA=OFF` and no legacy backend available,
+rpm links `rpmpgp_dummy.c` and **builds successfully with no OpenPGP support at
+all** - no key import, no verification, no signing, and no error until you try it.
+Stage 20 and `bf-selftest` both assert that `librpmio` exports `pgpParsePkts`, so
+this cannot regress quietly.
+
+**Packages build on the host, not in a clean root.** `BuildRequires:` is therefore
+documentation, not enforcement: a build can succeed because a header happens to be
+present on this machine, and fail everywhere else.
+
+**File ownership is 11%.** Dependency resolution is correct, but
+`rpm -qf /usr/bin/bash` still answers "not owned". Section 5 describes the fix.
+
+**The signing key sits on the build host, unprotected.** Correct for
+bootstrapping, wrong for production. It should move to a dedicated signer or a
+hardware token before anything is published publicly.
+
+**`git` ships without `git-svn`, `git-cvsserver`, `git-instaweb`, `git-p4`.** They
+need perl modules and a `/usr/bin/python` that BlackFlag does not have. Upstream
+distributions subpackage these; BlackFlag currently drops them.

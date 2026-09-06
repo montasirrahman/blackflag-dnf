@@ -60,6 +60,7 @@ stages/               one script per stage
 packaging/            blackflag-release + blackflag-base specs, provides generator
 tools/                bf-repo, bf-newpkg, hud2rpm
 patches/              upstream fixes applied automatically at unpack time
-docs/ARCHITECTURE.md  the design document
+docs/ARCHITECTURE.md  the design document, status and known limitations
+docs/OPERATIONS.md    day-to-day: add a package, maintain a repo, rotate keys
 docs/PACKAGING.md     how to build a BlackFlag package
 ```
