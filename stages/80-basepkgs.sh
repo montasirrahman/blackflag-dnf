@@ -44,6 +44,39 @@ case " $TIERS " in *" 3 "*)
      host, or apply them through an offline transaction." ;;
 esac
 
+# ------------------------------------------------------- installed-version check
+# A conversion records what is on the machine.  If the manifest version does not
+# match what is installed, building it would be an upgrade (or a downgrade, or --
+# as with grep and find here -- a substitution of an entirely different program),
+# and a breakage afterwards could not be attributed to either change.
+#
+# This caught two real cases on BlackFlag: `grep` is ugrep and `find` is bfs, both
+# deliberate distro choices that converting the GNU originals would have undone.
+probe_version() {
+    case "$1" in
+      gzip)      gzip --version ;;         tar)   tar --version ;;
+      diffutils) diff --version ;;         patch) patch --version ;;
+      sed)       sed --version ;;          m4)    m4 --version ;;
+      make)      make --version ;;         ugrep) grep --version ;;
+      bfs)       find --version ;;         file)  file --version ;;
+      sqlite)    sqlite3 --version ;;      xz)    xz --version ;;
+      zstd)      zstd --version ;;         bzip2) bzip2 --version 2>&1 ;;
+      *)         return 1 ;;
+    esac 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1
+}
+
+check_version() {
+    local name="$1" want="$2" have
+    have=$(probe_version "$name") || return 0      # nothing to compare against
+    [ -n "$have" ] || return 0
+    if [ "$have" != "$want" ]; then
+        warn "$name: manifest says $want but $have is installed - SKIPPING"
+        warn "     converting it would be an upgrade or a substitution, not a conversion"
+        return 1
+    fi
+    return 0
+}
+
 # ---------------------------------------------------------------- build recipes
 # Anything not named here uses the plain autotools path.  Where a package needs
 # different flags than upstream's default, the reason is stated.
@@ -152,6 +185,7 @@ while IFS='|' read -r tier name ver url; do
     case " $TIERS " in *" $tier "*) ;; *) continue;; esac
     done_already "base-$name" && { ok "$name (cached)"; continue; }
 
+    if ! check_version "$name" "$ver"; then skipped=$((skipped+1)); continue; fi
     msg "converting $name $ver (tier $tier)"
     tb="$BF_SRC/$(basename "$url")"
     if [ ! -s "$tb" ]; then
