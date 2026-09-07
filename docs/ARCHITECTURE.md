@@ -318,7 +318,7 @@ Built and working on `blackflag` as of 2026-09-06:
 
 ```
 rpm 4.19.1.1     dnf5 5.2.13.0     createrepo_c 1.2.1
-50 packages installed, all signed   (32 bootstrap + 18 converted base)
+59 packages installed, all signed   (32 bootstrap + 27 converted base)
 bf-selftest: 53 passed, 0 failed
 filesystem coverage: 12% RPM-owned
 ```
@@ -341,8 +341,9 @@ The package manager owns itself: `rpm -qf $(command -v dnf5)` answers
 - [x] Bootstrap stack repackaged as RPMs and self-owned
 - [ ] Publish the bootstrap repo to GitHub Pages (workflow written, Pages not yet enabled)
 - [ ] Stand up `repo.blackflag.com.bd`
-- [x] Tier 1 of the base converted: 18 leaf libraries and tools, zero ABI regressions
-- [ ] Tiers 2 and 3 of the base - coverage 12% -> 100%, then retire `blackflag-base`
+- [x] Tier 1 of the base converted: 18 leaf libraries, zero ABI regressions
+- [x] Tier 2 converted: 9 userland tools (tar, sed, grep, make, m4, ...)
+- [ ] Tier 3 and the long tail - coverage 12% -> 100%, then retire `blackflag-base`
 - [ ] Build-host isolation (a `mock` equivalent) so `BuildRequires` is actually enforced
 - [ ] Move the production signing key off the build host
 - [ ] `dnf5daemon` for PackageKit/GUI integration (sdbus-c++ is already built)
