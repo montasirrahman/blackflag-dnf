@@ -318,9 +318,9 @@ Built and working on `blackflag` as of 2026-09-06:
 
 ```
 rpm 4.19.1.1     dnf5 5.2.13.0     createrepo_c 1.2.1
-32 packages installed, all signed
+50 packages installed, all signed   (32 bootstrap + 18 converted base)
 bf-selftest: 53 passed, 0 failed
-filesystem coverage: 11% RPM-owned
+filesystem coverage: 12% RPM-owned
 ```
 
 The full round trip is verified: `rpmbuild` -> `rpmsign` -> `createrepo_c` ->
@@ -341,13 +341,40 @@ The package manager owns itself: `rpm -qf $(command -v dnf5)` answers
 - [x] Bootstrap stack repackaged as RPMs and self-owned
 - [ ] Publish the bootstrap repo to GitHub Pages (workflow written, Pages not yet enabled)
 - [ ] Stand up `repo.blackflag.com.bd`
-- [ ] Convert the LFS base to RPMs (S5C) - coverage 11% -> 100%, then retire `blackflag-base`
+- [x] Tier 1 of the base converted: 18 leaf libraries and tools, zero ABI regressions
+- [ ] Tiers 2 and 3 of the base - coverage 12% -> 100%, then retire `blackflag-base`
 - [ ] Build-host isolation (a `mock` equivalent) so `BuildRequires` is actually enforced
 - [ ] Move the production signing key off the build host
 - [ ] `dnf5daemon` for PackageKit/GUI integration (sdbus-c++ is already built)
 - [ ] Migrate to rpm 4.20+/sequoia once BlackFlag has a Rust toolchain (S11)
 - [ ] `hud2rpm` conversion of existing hud packages; retire hud to the shim
 - [ ] debuginfo subpackages, delta RPMs, comps groups
+
+## 10b. Converting the base: what a rebuild gets wrong
+
+Nobody recorded the configure flags LFS used, so every converted package is a
+guess until proven otherwise. Guessing wrong produces a library that compiles,
+packages, and installs cleanly, then breaks its consumers at run time. All four
+of these were real on this system, and all four were caught by `bf-abi-check`
+comparing the rebuild against the installed copy:
+
+| Package | What drifted |
+|---|---|
+| `readline` | linked no `libncursesw`, so no termcap symbol resolved. `--with-curses` governs the *static* link; the shared one needs `make SHLIB_LIBS=-lncursesw` |
+| `sqlite` | dropped seven public API symbols; `SQLITE_ENABLE_COLUMN_METADATA` was not defined |
+| `libarchive` | switched expat → libxml2 for xar. libxml2 did not exist when LFS built it, but this bootstrap installed it since |
+| `gmp` | tunes to the build CPU; a host-tuned rebuild omits `__gmpn_clz_tab`, which the installed generic build exports |
+
+Two further traps are about *what* you are converting, not how:
+
+- `grep` on BlackFlag is **ugrep 7.8.4** and `find` is **bfs 4.1.1**. Converting
+  the GNU originals would silently revert two deliberate distribution choices.
+  Stage 80 now probes the installed version and refuses when it disagrees with
+  the manifest.
+- GCC 15 defaults to C23, where `void g(){}` declares a function taking *no*
+  arguments rather than an unspecified list. gmp's own compiler probe calls such
+  a function with six arguments, fails to compile, and concludes there is no
+  working compiler. `-std=gnu17` restores the old semantics.
 
 ## 11. Known limitations, stated plainly
 
@@ -367,7 +394,7 @@ this cannot regress quietly.
 documentation, not enforcement: a build can succeed because a header happens to be
 present on this machine, and fail everywhere else.
 
-**File ownership is 11%.** Dependency resolution is correct, but
+**File ownership is 12%.** Dependency resolution is correct, but
 `rpm -qf /usr/bin/bash` still answers "not owned". Section 5 describes the fix.
 
 **The signing key sits on the build host, unprotected.** Correct for

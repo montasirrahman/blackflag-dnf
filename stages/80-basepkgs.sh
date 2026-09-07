@@ -148,6 +148,10 @@ recipe() {
                      --docdir=/usr/share/doc/attr-"$ver" ;;
       acl)       ./configure --prefix=/usr --disable-static \
                      --docdir=/usr/share/doc/acl-"$ver" ;;
+      ugrep)     ./configure --prefix=/usr ;;
+      bfs)       ./configure --prefix=/usr ;;
+      make|m4|sed|gzip|tar|diffutils|patch)
+                 ./configure --prefix=/usr ;;
       *)         ./configure --prefix=/usr --disable-static ;;
     esac
 }
