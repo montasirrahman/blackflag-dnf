@@ -365,16 +365,22 @@ comparing the rebuild against the installed copy:
 | `libarchive` | switched expat → libxml2 for xar. libxml2 did not exist when LFS built it, but this bootstrap installed it since |
 | `gmp` | tunes to the build CPU; a host-tuned rebuild omits `__gmpn_clz_tab`, which the installed generic build exports |
 
-Two further traps are about *what* you are converting, not how:
+Three further traps are about *what* you are converting, not how:
 
-- `grep` on BlackFlag is **ugrep 7.8.4** and `find` is **bfs 4.1.1**. Converting
-  the GNU originals would silently revert two deliberate distribution choices.
-  Stage 80 now probes the installed version and refuses when it disagrees with
-  the manifest.
+- **Do not ask an interactive shell what is installed.** `grep --version` at a
+  prompt on this machine reports `ugrep 7.8.4` and `find --version` reports
+  `bfs 4.1.1` — but `/usr/bin/grep` is GNU grep 3.12 and `/usr/bin/find` is GNU
+  findutils 4.10.0. Development tooling had installed shell *functions* shadowing
+  both. Scripts do not inherit those functions, so the interactive answer and the
+  scripted one disagree, and the interactive one is wrong. `probe_version` calls
+  binaries by absolute path for this reason.
 - GCC 15 defaults to C23, where `void g(){}` declares a function taking *no*
   arguments rather than an unspecified list. gmp's own compiler probe calls such
   a function with six arguments, fails to compile, and concludes there is no
   working compiler. `-std=gnu17` restores the old semantics.
+- `tar`'s configure aborts under root: its "can mknod a fifo without privileges"
+  probe is meaningless when you always can. `FORCE_UNSAFE_CONFIGURE=1` overrides
+  it, as LFS also does.
 
 ## 11. Known limitations, stated plainly
 

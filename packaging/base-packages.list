@@ -38,11 +38,8 @@
 2|diffutils|3.12|https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz
 2|patch|2.8|https://ftp.gnu.org/gnu/patch/patch-2.8.tar.xz
 2|sed|4.9|https://ftp.gnu.org/gnu/sed/sed-4.9.tar.xz
-# BlackFlag deliberately substitutes two GNU utilities.  Converting the GNU
-# originals would silently revert those decisions, so the manifest names what is
-# actually installed:  grep is ugrep, find is bfs.
-2|ugrep|7.8.4|https://github.com/Genivia/ugrep/archive/refs/tags/v7.8.4.tar.gz
-2|bfs|4.1.1|https://github.com/tavianator/bfs/archive/refs/tags/4.1.1.tar.gz
+2|grep|3.12|https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz
+2|findutils|4.10.0|https://ftp.gnu.org/gnu/findutils/findutils-4.10.0.tar.xz
 2|m4|1.4.20|https://ftp.gnu.org/gnu/m4/m4-1.4.20.tar.xz
 2|make|4.4.1|https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
 3|glibc|2.42|https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz

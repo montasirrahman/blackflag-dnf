@@ -50,19 +50,23 @@ esac
 # as with grep and find here -- a substitution of an entirely different program),
 # and a breakage afterwards could not be attributed to either change.
 #
-# This caught two real cases on BlackFlag: `grep` is ugrep and `find` is bfs, both
-# deliberate distro choices that converting the GNU originals would have undone.
+# Probe the BINARY, by absolute path, never the name.  An interactive shell can
+# have functions or aliases shadowing a command -- development tooling in
+# particular likes to wrap grep and find -- and asking such a shell what is
+# installed gives you the wrapper's version, not the system's.  Scripts do not
+# inherit those functions, so the two disagree, and the interactive answer is the
+# misleading one.
 probe_version() {
     case "$1" in
-      gzip)      gzip --version ;;         tar)   tar --version ;;
-      diffutils) diff --version ;;         patch) patch --version ;;
-      sed)       sed --version ;;          m4)    m4 --version ;;
-      make)      make --version ;;         ugrep) grep --version ;;
-      bfs)       find --version ;;         file)  file --version ;;
-      sqlite)    sqlite3 --version ;;      xz)    xz --version ;;
-      zstd)      zstd --version ;;         bzip2) bzip2 --version 2>&1 ;;
+      gzip)      /usr/bin/gzip --version ;;    tar)       /usr/bin/tar --version ;;
+      diffutils) /usr/bin/diff --version ;;    patch)     /usr/bin/patch --version ;;
+      sed)       /usr/bin/sed --version ;;     m4)        /usr/bin/m4 --version ;;
+      make)      /usr/bin/make --version ;;    grep)      /usr/bin/grep --version ;;
+      findutils) /usr/bin/find --version ;;    file)      /usr/bin/file --version ;;
+      sqlite)    /usr/bin/sqlite3 --version ;; xz)        /usr/bin/xz --version ;;
+      zstd)      /usr/bin/zstd --version ;;    bzip2)     /usr/bin/bzip2 --version 2>&1 ;;
       *)         return 1 ;;
-    esac 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1
+    esac 2>/dev/null | head -1 | /usr/bin/grep -oE '[0-9]+(\.[0-9]+)+' | head -1
 }
 
 check_version() {
@@ -148,9 +152,11 @@ recipe() {
                      --docdir=/usr/share/doc/attr-"$ver" ;;
       acl)       ./configure --prefix=/usr --disable-static \
                      --docdir=/usr/share/doc/acl-"$ver" ;;
-      ugrep)     ./configure --prefix=/usr ;;
-      bfs)       ./configure --prefix=/usr ;;
-      make|m4|sed|gzip|tar|diffutils|patch)
+      tar)       # tar's configure aborts under root because its "can mknod a fifo
+                 # without privileges" probe is meaningless when you always can.
+                 # LFS sets the same override.
+                 FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr ;;
+      make|m4|sed|gzip|diffutils|patch|grep|findutils)
                  ./configure --prefix=/usr ;;
       *)         ./configure --prefix=/usr --disable-static ;;
     esac
