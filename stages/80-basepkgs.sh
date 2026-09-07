@@ -77,12 +77,40 @@ recipe() {
                      --docdir=/usr/share/doc/readline-"$ver" ;;
       ncurses)   ./configure --prefix=/usr --mandir=/usr/share/man --with-shared \
                      --without-debug --without-normal --with-cxx-shared --enable-pc-files ;;
-      sqlite)    ./configure --prefix=/usr --disable-static --enable-fts4 --enable-fts5 ;;
-      gmp)       ./configure --prefix=/usr --enable-cxx --disable-static ;;
+      sqlite)    # SQLITE_ENABLE_COLUMN_METADATA is what provides
+                 # sqlite3_column_database_name and its six siblings.  Without it the
+                 # rebuild silently drops seven public API symbols that the installed
+                 # library exports, and anything using them fails to link or resolve.
+                 ./configure --prefix=/usr --disable-static --enable-fts4 --enable-fts5 \
+                     CPPFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA=1 \
+                               -DSQLITE_ENABLE_UNLOCK_NOTIFY=1 \
+                               -DSQLITE_ENABLE_DBSTAT_VTAB=1 \
+                               -DSQLITE_SECURE_DELETE=1" ;;
+      gmp)       # GCC 15 defaults to C23, where "void g(){}" declares a function
+                 # taking NO arguments rather than an unspecified list.  gmp 6.3.0's
+                 # compiler probe calls such a function with six arguments, so it
+                 # fails to compile and configure concludes -- wrongly -- that there
+                 # is no working compiler at all.  Pin the probe and the build to
+                 # C17 semantics.
+                 #
+                 # --host=none-linux-gnu disables gmp's CPU auto-detection.  gmp
+                 # otherwise tunes itself to the build machine and picks different
+                 # assembly paths, which changes which symbols exist: the installed
+                 # copy exports __gmpn_clz_tab (the generic leading-zero table) and a
+                 # host-tuned rebuild does not.  Building generic is what matches, and
+                 # is what a distributable library should be anyway.
+                 CFLAGS="${CFLAGS:-} -std=gnu17" CXXFLAGS="${CXXFLAGS:-} -std=gnu17" \
+                 ./configure --prefix=/usr --enable-cxx --disable-static \
+                     --host=none-linux-gnu ;;
       mpfr)      ./configure --prefix=/usr --disable-static --enable-thread-safe ;;
       libxcrypt) ./configure --prefix=/usr --enable-hashes=strong,glibc \
                      --enable-obsolete-api=no --disable-static --disable-failure-tokens ;;
-      libarchive)./configure --prefix=/usr --disable-static ;;
+      libarchive)# libarchive uses either libxml2 or expat for xar support, preferring
+                 # libxml2 when it is present.  libxml2 did not exist on this system
+                 # when LFS built libarchive, so the installed copy links expat -- but
+                 # the bootstrap installed libxml2 since, and an unqualified rebuild
+                 # now silently switches.  Pin it to what is actually installed.
+                 ./configure --prefix=/usr --disable-static --without-xml2 ;;
       attr)      ./configure --prefix=/usr --disable-static --sysconfdir=/etc \
                      --docdir=/usr/share/doc/attr-"$ver" ;;
       acl)       ./configure --prefix=/usr --disable-static \

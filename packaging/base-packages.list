@@ -26,8 +26,9 @@
 1|sqlite|3.50.4|https://www.sqlite.org/2025/sqlite-autoconf-3500400.tar.gz
 1|libarchive|3.8.1|https://github.com/libarchive/libarchive/releases/download/v3.8.1/libarchive-3.8.1.tar.xz
 1|libcap|2.76|https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz
-1|attr|2.5.2|https://download.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz
-1|acl|2.3.2|https://download.savannah.gnu.org/releases/acl/acl-2.3.2.tar.xz
+# savannah returns 502 intermittently; Debian's pool mirrors the same upstream tarball
+1|attr|2.5.2|https://deb.debian.org/debian/pool/main/a/attr/attr_2.5.2.orig.tar.xz
+1|acl|2.3.2|https://deb.debian.org/debian/pool/main/a/acl/acl_2.3.2.orig.tar.xz
 1|file|5.46|https://astron.com/pub/file/file-5.46.tar.gz
 1|gmp|6.3.0|https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
 1|mpfr|4.2.2|https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz

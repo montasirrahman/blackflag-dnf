@@ -22,7 +22,15 @@ rc=0
 
 soname()  { readelf -d "$1" 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p' | head -1; }
 needed()  { readelf -d "$1" 2>/dev/null | sed -n 's/.*NEEDED.*\[\(.*\)\].*/\1/p' | sort; }
-exports() { nm -D --defined-only "$1" 2>/dev/null | awk '{print $NF}' | sort -u; }
+# Only STRONG definitions count as ABI.  C++ vague-linkage symbols (nm type W or
+# V -- inline functions, template instantiations, typeinfo) are emitted
+# opportunistically wherever the compiler happens to instantiate them, so whether
+# a given library carries a copy varies with optimisation and compiler version.
+# Their absence is not a break: the symbol is still resolved from the library that
+# genuinely owns it. libgmpxx, for instance, may or may not carry a copy of
+# std::ctype<char>::do_widen, which libstdc++ defines regardless.
+exports()      { nm -D --defined-only "$1" 2>/dev/null | awk '$2 !~ /^[VWvwu]$/ {print $NF}' | sort -u; }
+weak_exports() { nm -D --defined-only "$1" 2>/dev/null | awk '$2 ~  /^[VW]$/  {print $NF}' | sort -u; }
 
 for pkg in "$@"; do
     [ -f "$pkg" ] || { echo "no such file: $pkg" >&2; rc=1; continue; }
@@ -58,6 +66,11 @@ for pkg in "$@"; do
                    "$rel" "$n" "$(echo $lost_sym | cut -c1-60)"
             rc=1; continue
         fi
+
+        lost_weak=$(comm -23 <(weak_exports "$rel") <(weak_exports "$f") | wc -l)
+        [ "$lost_weak" -gt 0 ] && \
+            printf "  ${C_Y}note${C_N}     %s carries %d fewer vague-linkage symbol(s) (harmless)\n" \
+                   "$rel" "$lost_weak"
 
         gained=$(comm -13 <(needed "$rel") <(needed "$f"))
         if [ -n "$gained" ]; then
